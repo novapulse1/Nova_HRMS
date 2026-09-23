@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+}
+
+/* Print specific styles for Payslips and Reports */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print\:border-none,
+  .print\:border-none * {
+    visibility: visible;
+  }
+  .print\:border-none {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

@@ -1,0 +1,183 @@
+// NovaPulse HRMS — Storage Engine (Persistent Local / IndexedDB Bridge)
+import {
+  INITIAL_ORGANIZATION,
+  INITIAL_BRANCHES,
+  INITIAL_DEPARTMENTS,
+  INITIAL_DESIGNATIONS,
+  INITIAL_ROLES,
+  INITIAL_EMPLOYEES,
+  INITIAL_USERS,
+  INITIAL_SHIFTS,
+  INITIAL_LEAVE_TYPES,
+  INITIAL_LEAVE_BALANCES,
+  INITIAL_LEAVE_APPLICATIONS,
+  INITIAL_SHIFT_SWAPS,
+  INITIAL_TICKETS,
+  INITIAL_ONBOARDING_INVITES,
+  INITIAL_ASSETS,
+  INITIAL_GEO_LOCATIONS,
+  INITIAL_HOLIDAYS,
+  INITIAL_SYSTEM_SETTINGS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_AUDIT_LOGS,
+  generateSeedAttendance,
+} from './seedData';
+
+const STORAGE_PREFIX = 'novapulse_hrms_v1_';
+
+export const STORAGE_KEYS = {
+  ORGANIZATION: `${STORAGE_PREFIX}organization`,
+  BRANCHES: `${STORAGE_PREFIX}branches`,
+  DEPARTMENTS: `${STORAGE_PREFIX}departments`,
+  DESIGNATIONS: `${STORAGE_PREFIX}designations`,
+  ROLES: `${STORAGE_PREFIX}roles`,
+  EMPLOYEES: `${STORAGE_PREFIX}employees`,
+  USERS: `${STORAGE_PREFIX}users`,
+  SHIFTS: `${STORAGE_PREFIX}shifts`,
+  SHIFT_ROSTERS: `${STORAGE_PREFIX}shift_rosters`,
+  SHIFT_SWAPS: `${STORAGE_PREFIX}shift_swaps`,
+  ATTENDANCE: `${STORAGE_PREFIX}attendance`,
+  REGULARIZATIONS: `${STORAGE_PREFIX}regularizations`,
+  LEAVE_TYPES: `${STORAGE_PREFIX}leave_types`,
+  LEAVE_BALANCES: `${STORAGE_PREFIX}leave_balances`,
+  LEAVE_APPLICATIONS: `${STORAGE_PREFIX}leave_applications`,
+  TICKETS: `${STORAGE_PREFIX}tickets`,
+  ONBOARDING_INVITES: `${STORAGE_PREFIX}onboarding_invites`,
+  ASSETS: `${STORAGE_PREFIX}assets`,
+  ASSET_HISTORY: `${STORAGE_PREFIX}asset_history`,
+  GEO_LOCATIONS: `${STORAGE_PREFIX}geo_locations`,
+  PAYROLL_PERIODS: `${STORAGE_PREFIX}payroll_periods`,
+  PAYSLIPS: `${STORAGE_PREFIX}payslips`,
+  HOLIDAYS: `${STORAGE_PREFIX}holidays`,
+  SYSTEM_SETTINGS: `${STORAGE_PREFIX}system_settings`,
+  NOTIFICATIONS: `${STORAGE_PREFIX}notifications`,
+  AUDIT_LOGS: `${STORAGE_PREFIX}audit_logs`,
+  CURRENT_USER_ID: `${STORAGE_PREFIX}current_user_id`,
+  ACTIVE_BRANCH_ID: `${STORAGE_PREFIX}active_branch_id`,
+};
+
+export class StorageEngine {
+  private static initialized = false;
+
+  public static init() {
+    if (this.initialized) return;
+
+    if (!localStorage.getItem(STORAGE_KEYS.ORGANIZATION)) {
+      this.resetToDefaults();
+    }
+    this.initialized = true;
+  }
+
+  public static resetToDefaults() {
+    localStorage.setItem(STORAGE_KEYS.ORGANIZATION, JSON.stringify(INITIAL_ORGANIZATION));
+    localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(INITIAL_BRANCHES));
+    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(INITIAL_DEPARTMENTS));
+    localStorage.setItem(STORAGE_KEYS.DESIGNATIONS, JSON.stringify(INITIAL_DESIGNATIONS));
+    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(INITIAL_ROLES));
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(INITIAL_SHIFTS));
+    localStorage.setItem(STORAGE_KEYS.SHIFT_ROSTERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.SHIFT_SWAPS, JSON.stringify(INITIAL_SHIFT_SWAPS));
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(generateSeedAttendance()));
+    localStorage.setItem(STORAGE_KEYS.REGULARIZATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LEAVE_TYPES, JSON.stringify(INITIAL_LEAVE_TYPES));
+    localStorage.setItem(STORAGE_KEYS.LEAVE_BALANCES, JSON.stringify(INITIAL_LEAVE_BALANCES));
+    localStorage.setItem(STORAGE_KEYS.LEAVE_APPLICATIONS, JSON.stringify(INITIAL_LEAVE_APPLICATIONS));
+    localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(INITIAL_TICKETS));
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING_INVITES, JSON.stringify(INITIAL_ONBOARDING_INVITES));
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(INITIAL_ASSETS));
+    localStorage.setItem(STORAGE_KEYS.ASSET_HISTORY, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.GEO_LOCATIONS, JSON.stringify(INITIAL_GEO_LOCATIONS));
+    localStorage.setItem(STORAGE_KEYS.PAYROLL_PERIODS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.PAYSLIPS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(INITIAL_HOLIDAYS));
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'user-001'); // Default Super Admin
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, 'all');
+
+    this.notifySubscribers('DATABASE_RESET');
+  }
+
+  public static get<T>(key: string, defaultValue: T): T {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+      console.error(`Error reading ${key} from storage:`, e);
+      return defaultValue;
+    }
+  }
+
+  public static set<T>(key: string, value: T): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      this.notifySubscribers(key);
+    } catch (e) {
+      console.error(`Error writing ${key} to storage:`, e);
+    }
+  }
+
+  public static getList<T extends { id: string }>(key: string): T[] {
+    return this.get<T[]>(key, []);
+  }
+
+  public static setList<T extends { id: string }>(key: string, items: T[]): void {
+    this.set(key, items);
+  }
+
+  public static insert<T extends { id: string }>(key: string, item: T): T {
+    const list = this.getList<T>(key);
+    const existingIndex = list.findIndex(x => x.id === item.id);
+    if (existingIndex >= 0) {
+      list[existingIndex] = item;
+    } else {
+      list.unshift(item);
+    }
+    this.setList(key, list);
+    return item;
+  }
+
+  public static update<T extends { id: string }>(key: string, id: string, updates: Partial<T>): T | undefined {
+    const list = this.getList<T>(key);
+    const index = list.findIndex(x => x.id === id);
+    if (index === -1) return undefined;
+    const updated = { ...list[index], ...updates };
+    list[index] = updated;
+    this.setList(key, list);
+    return updated;
+  }
+
+  public static remove<T extends { id: string }>(key: string, id: string): boolean {
+    const list = this.getList<T>(key);
+    const filtered = list.filter(x => x.id !== id);
+    if (filtered.length === list.length) return false;
+    this.setList(key, filtered);
+    return true;
+  }
+
+  // Event dispatcher for reactive updates
+  private static subscribers: Array<(event: string) => void> = [];
+
+  public static subscribe(callback: (event: string) => void): () => void {
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+
+  private static notifySubscribers(event: string) {
+    this.subscribers.forEach(cb => {
+      try {
+        cb(event);
+      } catch (err) {
+        console.error('Subscriber error:', err);
+      }
+    });
+  }
+}
+
+// Auto-initialize on module load
+StorageEngine.init();
