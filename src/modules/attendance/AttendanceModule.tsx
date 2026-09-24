@@ -74,6 +74,13 @@ export const AttendanceModule: React.FC = () => {
   const shifts = ShiftService.getShifts();
   const regularizations = AttendanceService.getRegularizations();
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const myTodayAttendance = currentEmployee
+    ? allAttendance.find(a => a.employeeId === currentEmployee.id && a.date === todayStr)
+    : undefined;
+  const hasClockedIn = !!myTodayAttendance?.checkIn;
+  const hasClockedOut = !!myTodayAttendance?.checkOut;
+
   // Filter attendance
   let filteredRecords = allAttendance.filter(a => a.date === selectedDate);
   if (statusFilter !== 'all') {
@@ -92,14 +99,18 @@ export const AttendanceModule: React.FC = () => {
 
   const handleManualPunch = (e: React.FormEvent) => {
     e.preventDefault();
-    AttendanceService.recordPunch({
-      employeeId: punchForm.employeeId,
-      type: punchForm.type,
-      time: punchForm.time,
-      source: punchForm.source,
-      location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'Office Gate Terminal' },
-    });
-    setIsPunchModalOpen(false);
+    try {
+      AttendanceService.recordPunch({
+        employeeId: punchForm.employeeId,
+        type: punchForm.type,
+        time: punchForm.time,
+        source: punchForm.source,
+        location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'Office Gate Terminal' },
+      });
+      setIsPunchModalOpen(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to record manual punch');
+    }
   };
 
   const [isGpsLocating, setIsGpsLocating] = useState(false);
@@ -118,34 +129,42 @@ export const AttendanceModule: React.FC = () => {
         const lng = pos.coords.longitude;
         const verification = GeoLocationService.verifyGeofence(lat, lng);
 
-        AttendanceService.recordPunch({
-          employeeId: currentEmployee.id,
-          type,
-          source: 'Mobile GPS',
-          location: {
-            lat,
-            lng,
-            inGeofence: verification.isAuthorized,
-            address: verification.nearestBranch?.name || 'Mobile GPS Clock-In',
-            distanceFromOfficeMeters: verification.distanceMeters,
-          },
-        });
+        try {
+          AttendanceService.recordPunch({
+            employeeId: currentEmployee.id,
+            type,
+            source: 'Mobile GPS',
+            location: {
+              lat,
+              lng,
+              inGeofence: verification.isAuthorized,
+              address: verification.nearestBranch?.name || 'Mobile GPS Clock-In',
+              distanceFromOfficeMeters: verification.distanceMeters,
+            },
+          });
 
-        alert(
-          `Clock-${type} successfully recorded via GPS!\n\n` +
-          `Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}\n` +
-          `Status: ${verification.isAuthorized ? '✓ Within Office Geofence perimeter' : '⚠ Remote / Outside Geofence'}`
-        );
+          alert(
+            `Clock-${type} successfully recorded via GPS!\n\n` +
+            `Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}\n` +
+            `Status: ${verification.isAuthorized ? '✓ Within Office Geofence perimeter' : '⚠ Remote / Outside Geofence'}`
+          );
+        } catch (err: any) {
+          alert(err.message || `Failed to record Clock-${type}`);
+        }
       },
       (err) => {
         setIsGpsLocating(false);
         alert(`Could not fetch high-accuracy GPS coordinates (${err.message}). Recording standard mobile check-${type.toLowerCase()}.`);
-        AttendanceService.recordPunch({
-          employeeId: currentEmployee.id,
-          type,
-          source: 'Mobile GPS',
-          location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'Office Location (Default GPS)' },
-        });
+        try {
+          AttendanceService.recordPunch({
+            employeeId: currentEmployee.id,
+            type,
+            source: 'Mobile GPS',
+            location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'Office Location (Default GPS)' },
+          });
+        } catch (e: any) {
+          alert(e.message || `Failed to record Clock-${type}`);
+        }
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -300,25 +319,55 @@ export const AttendanceModule: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {currentEmployee && (
-            <div className="flex items-center gap-1.5">
+          {currentEmployee ? (
+            <div className="flex items-center gap-2">
+              {!hasClockedIn && (
+                <Button
+                  size="sm"
+                  variant="success"
+                  isLoading={isGpsLocating}
+                  onClick={() => handleGpsPunch('IN')}
+                  leftIcon={<MapPin className="w-4 h-4" />}
+                >
+                  GPS Clock In
+                </Button>
+              )}
+
+              {hasClockedIn && !hasClockedOut && (
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 px-2">In: {myTodayAttendance.checkIn}</span>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    isLoading={isGpsLocating}
+                    onClick={() => handleGpsPunch('OUT')}
+                    leftIcon={<Clock className="w-4 h-4" />}
+                  >
+                    GPS Clock Out
+                  </Button>
+                </div>
+              )}
+
+              {hasClockedIn && hasClockedOut && (
+                <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-bold text-emerald-800">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>In: {myTodayAttendance.checkIn} • Out: {myTodayAttendance.checkOut}</span>
+                  <Badge variant="success">{myTodayAttendance.status}</Badge>
+                </div>
+              )}
+
               <Button
                 size="sm"
-                variant="success"
-                isLoading={isGpsLocating}
-                onClick={() => handleGpsPunch('IN')}
-                leftIcon={<MapPin className="w-4 h-4" />}
+                variant="outline"
+                onClick={() => setIsRegModalOpen(true)}
+                leftIcon={<Clock className="w-4 h-4" />}
               >
-                GPS Clock In
+                Regularize
               </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                isLoading={isGpsLocating}
-                onClick={() => handleGpsPunch('OUT')}
-              >
-                GPS Clock Out
-              </Button>
+            </div>
+          ) : (
+            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              No employee profile linked to active session
             </div>
           )}
 

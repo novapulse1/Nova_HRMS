@@ -70,7 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsub;
   }, []);
 
-  const currentEmployee = EmployeeService.getById(currentUser.employeeId);
+  // Securely resolve active employee record for the authenticated user within the active tenant scope
+  const activeTenantId = StorageEngine.getActiveTenantId();
+  let currentEmployee = currentUser.employeeId ? EmployeeService.getById(currentUser.employeeId) : undefined;
+  if (!currentEmployee && currentUser.email) {
+    currentEmployee = EmployeeService.getAll().find(
+      e => e.email?.toLowerCase() === currentUser.email?.toLowerCase() &&
+           (e.organizationId === activeTenantId || (e as any).tenantId === activeTenantId || activeTenantId === 'NP-000001')
+    );
+  }
+  // When active tenant is a specific client tenant, ensure employee belongs strictly to that tenant
+  if (currentEmployee && activeTenantId && activeTenantId !== 'NP-000001') {
+    if (currentEmployee.organizationId && currentEmployee.organizationId !== activeTenantId && (currentEmployee as any).tenantId !== activeTenantId) {
+      currentEmployee = undefined;
+    }
+  }
+
   const roles = AuthService.getRoles();
   const userRole = roles.find(r => r.name === currentUser.roleName || r.id === currentUser.roleId);
 

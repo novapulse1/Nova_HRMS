@@ -43,6 +43,10 @@ export class AttendanceService {
     const index = existingRecords.findIndex(a => a.employeeId === params.employeeId && a.date === today);
 
     if (params.type === 'IN') {
+      if (index >= 0 && existingRecords[index]?.checkIn) {
+        throw new Error(`Already clocked in today at ${existingRecords[index].checkIn}. Duplicate Clock In is not allowed.`);
+      }
+
       let lateMinutes = 0;
       let calculatedStatus: AttendanceStatus = 'Present';
 
@@ -87,22 +91,11 @@ export class AttendanceService {
     } else {
       // Punch OUT
       let record = index >= 0 ? existingRecords[index] : null;
-      if (!record) {
-        record = {
-          id: `att-${Date.now()}`,
-          organizationId: StorageEngine.getActiveTenantId(),
-          employeeId: params.employeeId,
-          date: today,
-          shiftId: shift ? shift.id : 'shift-gen-01',
-          checkIn: '09:00:00',
-          status: 'Present',
-          workDurationMinutes: 0,
-          lateMinutes: 0,
-          earlyDepartureMinutes: 0,
-          overtimeMinutes: 0,
-          isRegularized: false,
-          punchSource: params.source || 'Web Portal',
-        };
+      if (!record || !record.checkIn) {
+        throw new Error('Cannot Clock Out before Clocking In for today.');
+      }
+      if (record.checkOut) {
+        throw new Error(`Already clocked out today at ${record.checkOut}. Duplicate Clock Out is not allowed.`);
       }
 
       // Calculate work duration

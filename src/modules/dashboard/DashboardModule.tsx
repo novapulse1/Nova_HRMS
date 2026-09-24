@@ -104,16 +104,31 @@ export const DashboardModule: React.FC<{ onNavigate: (module: string) => void }>
     { date: '21 Sep', present: presentCount || 8, late: lateCount || 2, leave: leaveCount || 1, absent: absentCount || 0 },
   ];
 
+  // Check personal attendance for the currently authenticated employee record for today
+  const myTodayAttendance = currentEmployee
+    ? allAttendance.find(a => a.employeeId === currentEmployee.id && a.date === today)
+    : undefined;
+
+  const hasClockedIn = !!myTodayAttendance?.checkIn;
+  const hasClockedOut = !!myTodayAttendance?.checkOut;
+
   // Quick Punch Action
   const handleQuickPunch = (type: 'IN' | 'OUT') => {
-    if (!currentEmployee) return;
-    AttendanceService.recordPunch({
-      employeeId: currentEmployee.id,
-      type,
-      source: 'Web Portal',
-      location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'NovaPulse HQ' },
-    });
-    alert(`Successfully punched ${type} for today!`);
+    if (!currentEmployee) {
+      alert('No active employee record is linked to this account.');
+      return;
+    }
+    try {
+      AttendanceService.recordPunch({
+        employeeId: currentEmployee.id,
+        type,
+        source: 'Web Portal',
+        location: { lat: 28.6280, lng: 77.3649, inGeofence: true, address: 'NovaPulse HQ' },
+      });
+      alert(`Successfully clocked ${type.toLowerCase()} for today!`);
+    } catch (err: any) {
+      alert(err.message || `Failed to clock ${type.toLowerCase()}`);
+    }
   };
 
   const handleExportSummary = () => {
@@ -147,23 +162,52 @@ export const DashboardModule: React.FC<{ onNavigate: (module: string) => void }>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {currentEmployee && (
-              <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 flex items-center gap-3">
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => handleQuickPunch('IN')}
-                  leftIcon={<Fingerprint className="w-4 h-4" />}
-                >
-                  Clock In
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleQuickPunch('OUT')}
-                >
-                  Clock Out
-                </Button>
+            {currentEmployee ? (
+              <div className="bg-white/10 backdrop-blur-md p-2 sm:p-2.5 rounded-2xl border border-white/20 flex items-center gap-2 sm:gap-3">
+                {!hasClockedIn && (
+                  <Button
+                    size="sm"
+                    variant="success"
+                    onClick={() => handleQuickPunch('IN')}
+                    leftIcon={<Fingerprint className="w-4 h-4" />}
+                  >
+                    Clock In
+                  </Button>
+                )}
+
+                {hasClockedIn && !hasClockedOut && (
+                  <>
+                    <div className="text-xs text-emerald-200 font-semibold px-2">
+                      <span className="text-white/60">In:</span> {myTodayAttendance.checkIn}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleQuickPunch('OUT')}
+                      className="bg-rose-600/90 hover:bg-rose-700 text-white border-0"
+                      leftIcon={<Clock className="w-4 h-4" />}
+                    >
+                      Clock Out
+                    </Button>
+                  </>
+                )}
+
+                {hasClockedIn && hasClockedOut && (
+                  <div className="flex items-center gap-2 px-2 text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-200 font-medium">
+                      In: {myTodayAttendance.checkIn} • Out: {myTodayAttendance.checkOut}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-400/30">
+                      ✓ {myTodayAttendance.status}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20 flex items-center gap-2 text-xs text-brand-200">
+                <span className="w-2 h-2 rounded-full bg-amber-400/80"></span>
+                <span>Administrative Session • No Employee Profile</span>
               </div>
             )}
             <Button
