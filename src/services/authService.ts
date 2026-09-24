@@ -1,6 +1,7 @@
 // Authentication & Authorization Service
 import { StorageEngine, STORAGE_KEYS } from '../database/storageEngine';
 import { User, Role, PermissionSet, Tenant, AdminImpersonationSession } from '../database/schema';
+import { AuditService } from './auditService';
 
 export class AuthService {
   public static getUsers(): User[] {
@@ -78,12 +79,31 @@ export class AuthService {
     StorageEngine.set(STORAGE_KEYS.CURRENT_USER_ID, clientUser.id);
     StorageEngine.setAppEnvironment('client');
 
+    AuditService.log({
+      userId: superAdminUser.id,
+      userName: superAdminUser.fullName,
+      userRole: 'Super Admin',
+      module: 'Admin Impersonation',
+      action: 'IMPERSONATE',
+      description: `Super Admin (${superAdminUser.fullName}) initiated impersonation session for ${tenant.companyName} (${tenant.tenantId}). Reason: ${reason}`,
+      recordId: session.id,
+    });
+
     return { session, clientUser };
   }
 
   public static exitAdminMode(superAdminUserId: string = 'user-001'): void {
     const session = StorageEngine.getImpersonationSession();
     if (session) {
+      AuditService.log({
+        userId: session.superAdminId || superAdminUserId,
+        userName: session.superAdminName || 'Super Admin',
+        userRole: 'Super Admin',
+        module: 'Admin Impersonation',
+        action: 'EXIT_IMPERSONATION',
+        description: `Super Admin ended impersonation session for ${session.companyName} (${session.tenantId})`,
+        recordId: session.id,
+      });
       StorageEngine.setImpersonationSession(null);
     }
     StorageEngine.setActiveTenantId('NP-000001');

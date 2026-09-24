@@ -776,7 +776,7 @@ export interface AuditLog {
   userName: string;
   userRole: string;
   module: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'EXPORT' | 'LOGIN' | 'PROCESS';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'EXPORT' | 'LOGIN' | 'PROCESS' | 'IMPERSONATE' | 'EXIT_IMPERSONATION';
   description: string;
   recordId?: string;
   previousValue?: string;
