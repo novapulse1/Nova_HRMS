@@ -16,7 +16,7 @@ export class ShiftService {
   public static createShift(shift: Omit<Shift, 'id'>): Shift {
     const newShift: Shift = {
       ...shift,
-      id: `shift-${Date.now()}`,
+      id: `shift-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     };
     return StorageEngine.insert<Shift>(STORAGE_KEYS.SHIFTS, newShift);
   }

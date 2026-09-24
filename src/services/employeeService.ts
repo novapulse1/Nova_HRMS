@@ -62,7 +62,7 @@ export class EmployeeService {
       );
     }
 
-    const id = `emp-${Date.now()}`;
+    const id = `emp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const newEmp: Employee = {
       ...employee,
       organizationId: tenantId,
