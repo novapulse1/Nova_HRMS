@@ -68,55 +68,92 @@ export const STORAGE_KEYS = {
   ACTIVE_BRANCH_ID: `${STORAGE_PREFIX}active_branch_id`,
 };
 
+const inMemoryStorage: Record<string, string> = {};
+
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return inMemoryStorage[key] || null;
+      }
+    }
+    return inMemoryStorage[key] || null;
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        inMemoryStorage[key] = value;
+      }
+    } else {
+      inMemoryStorage[key] = value;
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        delete inMemoryStorage[key];
+      }
+    } else {
+      delete inMemoryStorage[key];
+    }
+  }
+};
+
 export class StorageEngine {
   private static initialized = false;
 
   public static init() {
     if (this.initialized) return;
 
-    if (!localStorage.getItem(STORAGE_KEYS.ORGANIZATION)) {
+    if (!safeStorage.getItem(STORAGE_KEYS.ORGANIZATION)) {
       this.resetToDefaults();
     }
     this.initialized = true;
   }
 
   public static resetToDefaults() {
-    localStorage.setItem(STORAGE_KEYS.TENANTS, JSON.stringify(INITIAL_TENANTS));
-    localStorage.setItem(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(INITIAL_TENANT_SUBSCRIPTIONS));
-    localStorage.setItem(STORAGE_KEYS.LICENSE_CHANGES, JSON.stringify(INITIAL_TENANT_LICENSE_CHANGES));
-    localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_TENANT_PAYMENTS));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_TENANT_ID, 'NP-000001');
-    localStorage.setItem(STORAGE_KEYS.APP_ENVIRONMENT, 'super_admin');
-    localStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
+    safeStorage.setItem(STORAGE_KEYS.TENANTS, JSON.stringify(INITIAL_TENANTS));
+    safeStorage.setItem(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(INITIAL_TENANT_SUBSCRIPTIONS));
+    safeStorage.setItem(STORAGE_KEYS.LICENSE_CHANGES, JSON.stringify(INITIAL_TENANT_LICENSE_CHANGES));
+    safeStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_TENANT_PAYMENTS));
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_TENANT_ID, 'NP-000001');
+    safeStorage.setItem(STORAGE_KEYS.APP_ENVIRONMENT, 'super_admin');
+    safeStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
 
-    localStorage.setItem(STORAGE_KEYS.ORGANIZATION, JSON.stringify(INITIAL_ORGANIZATION));
-    localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(INITIAL_BRANCHES));
-    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(INITIAL_DEPARTMENTS));
-    localStorage.setItem(STORAGE_KEYS.DESIGNATIONS, JSON.stringify(INITIAL_DESIGNATIONS));
-    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(INITIAL_ROLES));
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(INITIAL_SHIFTS));
-    localStorage.setItem(STORAGE_KEYS.SHIFT_ROSTERS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.SHIFT_SWAPS, JSON.stringify(INITIAL_SHIFT_SWAPS));
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(generateSeedAttendance()));
-    localStorage.setItem(STORAGE_KEYS.REGULARIZATIONS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.LEAVE_TYPES, JSON.stringify(INITIAL_LEAVE_TYPES));
-    localStorage.setItem(STORAGE_KEYS.LEAVE_BALANCES, JSON.stringify(INITIAL_LEAVE_BALANCES));
-    localStorage.setItem(STORAGE_KEYS.LEAVE_APPLICATIONS, JSON.stringify(INITIAL_LEAVE_APPLICATIONS));
-    localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(INITIAL_TICKETS));
-    localStorage.setItem(STORAGE_KEYS.ONBOARDING_INVITES, JSON.stringify(INITIAL_ONBOARDING_INVITES));
-    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(INITIAL_ASSETS));
-    localStorage.setItem(STORAGE_KEYS.ASSET_HISTORY, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.GEO_LOCATIONS, JSON.stringify(INITIAL_GEO_LOCATIONS));
-    localStorage.setItem(STORAGE_KEYS.PAYROLL_PERIODS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.PAYSLIPS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(INITIAL_HOLIDAYS));
-    localStorage.setItem(STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'user-001'); // Default Super Admin
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, 'all');
+    safeStorage.setItem(STORAGE_KEYS.ORGANIZATION, JSON.stringify(INITIAL_ORGANIZATION));
+    safeStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(INITIAL_BRANCHES));
+    safeStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(INITIAL_DEPARTMENTS));
+    safeStorage.setItem(STORAGE_KEYS.DESIGNATIONS, JSON.stringify(INITIAL_DESIGNATIONS));
+    safeStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(INITIAL_ROLES));
+    safeStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
+    safeStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    safeStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(INITIAL_SHIFTS));
+    safeStorage.setItem(STORAGE_KEYS.SHIFT_ROSTERS, JSON.stringify([]));
+    safeStorage.setItem(STORAGE_KEYS.SHIFT_SWAPS, JSON.stringify(INITIAL_SHIFT_SWAPS));
+    safeStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(generateSeedAttendance()));
+    safeStorage.setItem(STORAGE_KEYS.REGULARIZATIONS, JSON.stringify([]));
+    safeStorage.setItem(STORAGE_KEYS.LEAVE_TYPES, JSON.stringify(INITIAL_LEAVE_TYPES));
+    safeStorage.setItem(STORAGE_KEYS.LEAVE_BALANCES, JSON.stringify(INITIAL_LEAVE_BALANCES));
+    safeStorage.setItem(STORAGE_KEYS.LEAVE_APPLICATIONS, JSON.stringify(INITIAL_LEAVE_APPLICATIONS));
+    safeStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(INITIAL_TICKETS));
+    safeStorage.setItem(STORAGE_KEYS.ONBOARDING_INVITES, JSON.stringify(INITIAL_ONBOARDING_INVITES));
+    safeStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(INITIAL_ASSETS));
+    safeStorage.setItem(STORAGE_KEYS.ASSET_HISTORY, JSON.stringify([]));
+    safeStorage.setItem(STORAGE_KEYS.GEO_LOCATIONS, JSON.stringify(INITIAL_GEO_LOCATIONS));
+    safeStorage.setItem(STORAGE_KEYS.PAYROLL_PERIODS, JSON.stringify([]));
+    safeStorage.setItem(STORAGE_KEYS.PAYSLIPS, JSON.stringify([]));
+    safeStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(INITIAL_HOLIDAYS));
+    safeStorage.setItem(STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
+    safeStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
+    safeStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+    safeStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'user-001'); // Default Super Admin
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, 'all');
 
     this.notifySubscribers('DATABASE_RESET');
   }
@@ -145,14 +182,14 @@ export class StorageEngine {
     if (session) {
       this.set(STORAGE_KEYS.IMPERSONATION_SESSION, session);
     } else {
-      localStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
+      safeStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
       this.notifySubscribers(STORAGE_KEYS.IMPERSONATION_SESSION);
     }
   }
 
   public static get<T>(key: string, defaultValue: T): T {
     try {
-      const item = localStorage.getItem(key);
+      const item = safeStorage.getItem(key);
       return item ? JSON.parse(item) : defaultValue;
     } catch (e) {
       console.error(`Error reading ${key} from storage:`, e);
@@ -162,7 +199,7 @@ export class StorageEngine {
 
   public static set<T>(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      safeStorage.setItem(key, JSON.stringify(value));
       this.notifySubscribers(key);
     } catch (e) {
       console.error(`Error writing ${key} to storage:`, e);

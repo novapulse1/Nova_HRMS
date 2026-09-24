@@ -1,10 +1,15 @@
-// Authentication, Multi-Tenant SaaS, and RBAC Context
+// ====================================================================
+// NovaPulse HRMS — Authentication, Multi-Tenant SaaS & RBAC Context
+// Linked to Supabase Auth & Tenant Isolation
+// ====================================================================
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Role, Employee, PermissionSet, Tenant, AdminImpersonationSession } from '../database/schema';
 import { AuthService } from '../services/authService';
 import { EmployeeService } from '../services/employeeService';
 import { TenantService } from '../services/tenantService';
 import { StorageEngine, STORAGE_KEYS } from '../database/storageEngine';
+import { SupabaseAuthService, TenantUserProfile } from '../services/supabaseAuthService';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 interface AuthContextType {
   currentUser: User;
@@ -13,12 +18,15 @@ interface AuthContextType {
   availableUsers: User[];
   switchUser: (userId: string) => void;
   can: (module: string, action: keyof PermissionSet) => boolean;
+
+  // Role Access Levels
   isSuperAdmin: boolean;
+  isClientAdmin: boolean;
   isHR: boolean;
   isManager: boolean;
   isEmployee: boolean;
 
-  // Multi-Tenant SaaS context
+  // Multi-Tenant SaaS State
   appEnvironment: 'super_admin' | 'client';
   setAppEnvironment: (env: 'super_admin' | 'client') => void;
   activeTenant: Tenant;
@@ -28,6 +36,12 @@ interface AuthContextType {
   loginAsClient: (tenantId: string, reason?: string) => void;
   exitAdminMode: () => void;
   isImpersonating: boolean;
+
+  // Supabase Auth Methods
+  signIn: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  isSupabaseActive: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,6 +77,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const switchUser = (userId: string) => {
     const u = AuthService.setCurrentUser(userId);
     setCurrentUserState(u);
+    // Securely align tenant to authenticated user's organizationId
+    if (u.organizationId && u.organizationId !== 'NP-000001' && u.roleName !== 'Super Admin') {
+      const t = TenantService.getById(u.organizationId);
+      if (t) {
+        setActiveTenantState(t);
+        StorageEngine.setActiveTenantId(t.tenantId);
+      }
+    }
   };
 
   const setAppEnvironment = (env: 'super_admin' | 'client') => {
@@ -92,12 +114,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveTenantState(AuthService.getActiveTenant());
   };
 
+  const signIn = async (email: string, password?: string) => {
+    const res = await SupabaseAuthService.signIn(email, password);
+    if (res.success && res.user) {
+      // Find matching local user or adapt
+      const u: User = {
+        id: res.user.id,
+        organizationId: res.user.tenantId,
+        employeeId: res.user.employeeId || `emp-${res.user.id}`,
+        email: res.user.email,
+        fullName: res.user.fullName,
+        roleId: `role-${res.user.role}`,
+        roleName: res.user.role === 'super_admin' ? 'Super Admin' : res.user.role === 'client_admin' ? 'HR Admin' : res.user.role === 'manager' ? 'Manager' : 'Employee',
+        avatar: res.user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        status: 'active',
+      };
+      setCurrentUserState(u);
+      StorageEngine.set(STORAGE_KEYS.CURRENT_USER_ID, u.id);
+
+      if (res.tenant) {
+        setActiveTenantState(res.tenant);
+        StorageEngine.setActiveTenantId(res.tenant.tenantId);
+      }
+
+      if (res.user.role === 'super_admin') {
+        setAppEnvironment('super_admin');
+      } else {
+        setAppEnvironment('client');
+      }
+
+      return { success: true };
+    }
+    return { success: false, message: res.message || 'Login failed' };
+  };
+
+  const signOut = async () => {
+    await SupabaseAuthService.signOut();
+    StorageEngine.setActiveTenantId('NP-000001');
+    StorageEngine.setAppEnvironment('super_admin');
+    setCurrentUserState(availableUsers[0]);
+  };
+
+  const resetPassword = async (email: string) => {
+    return SupabaseAuthService.resetPassword(email);
+  };
+
   const can = (module: string, action: keyof PermissionSet): boolean => {
     if (currentUser.roleName === 'Super Admin') return true;
     return AuthService.hasPermission(module, action, currentUser.roleName);
   };
 
   const isSuperAdmin = currentUser.roleName === 'Super Admin' || appEnvironment === 'super_admin';
+  const isClientAdmin = isSuperAdmin || currentUser.roleName === 'HR Admin' || currentUser.roleName === 'Payroll Admin' || currentUser.roleName === 'IT Admin';
   const isHR = isSuperAdmin || currentUser.roleName === 'HR Admin' || currentUser.roleName === 'HR Executive';
   const isManager = isSuperAdmin || isHR || currentUser.roleName === 'Manager' || currentUser.roleName === 'Team Leader';
   const isEmployee = currentUser.roleName === 'Employee';
@@ -113,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchUser,
         can,
         isSuperAdmin,
+        isClientAdmin,
         isHR,
         isManager,
         isEmployee,
@@ -125,6 +194,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginAsClient,
         exitAdminMode,
         isImpersonating,
+        signIn,
+        signOut,
+        resetPassword,
+        isSupabaseActive: isSupabaseConfigured(),
       }}
     >
       {children}

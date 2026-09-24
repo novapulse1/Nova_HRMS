@@ -771,6 +771,7 @@ export interface Notification {
 export interface AuditLog {
   id: string;
   organizationId: string;
+  tenantId?: string;
   userId: string;
   userName: string;
   userRole: string;
