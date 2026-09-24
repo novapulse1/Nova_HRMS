@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Building2,
   Search,
@@ -28,6 +28,7 @@ import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
 import { Badge } from '../../components/common/Badge';
+import { PageHeader } from '../../components/common/PageHeader';
 
 export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; onCloseCreateModalExternal?: () => void }> = ({
   isCreateModalOpenExternal = false,
@@ -173,25 +174,24 @@ export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; o
   return (
     <div className="space-y-6 text-slate-100">
       {/* Top Header & Quick Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">
-            Customer Accounts & Tenant Registry
-          </h2>
-          <p className="text-xs text-slate-400">
-            {allTenants.length} Total Enterprise Companies Registered on NovaPulse Cloud
-          </p>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          Create New Client
-        </Button>
-      </div>
+      <PageHeader
+        title="Client Management"
+        badge={
+          <span className="text-xs bg-purple-950 text-purple-300 border border-purple-800 font-bold px-2.5 py-0.5 rounded-full">
+            {allTenants.length} Total
+          </span>
+        }
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Create New Client
+          </Button>
+        }
+      />
 
       {/* Filter & Search Toolbar */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">

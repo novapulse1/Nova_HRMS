@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   Building2,
   Users,
@@ -71,27 +71,24 @@ export const SuperAdminDashboard: React.FC<{ onNavigate: (section: string) => vo
   return (
     <div className="space-y-6 text-slate-100">
       {/* Executive SaaS Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border border-purple-800/40 p-6 sm:p-8 shadow-2xl">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-900/60 border border-purple-700/60 text-purple-200 text-xs font-extrabold tracking-wide">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border border-purple-800/40 p-5 sm:p-6 shadow-xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-purple-900/60 border border-purple-700/60 text-purple-200 text-xs font-bold tracking-wide">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               Multi-Tenant Cluster Operational • Global Control Room
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              NovaPulse Super Admin Central
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              NovaPulse Super Admin Dashboard
             </h2>
-            <p className="text-xs sm:text-sm text-purple-200/80 max-w-xl">
-              Centralized administration across {stats.totalClients} enterprise customer accounts, {stats.totalLicences} active workforce licenses, and live subscription billing.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Button
               size="sm"
               variant="primary"
               onClick={() => onNavigate('clients')}
-              className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
+              className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
               leftIcon={<Building2 className="w-4 h-4" />}
             >
               Manage Tenants
@@ -100,7 +97,7 @@ export const SuperAdminDashboard: React.FC<{ onNavigate: (section: string) => vo
               size="sm"
               variant="outline"
               onClick={() => onNavigate('licences')}
-              className="bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 font-bold"
+              className="bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 font-bold text-xs"
               leftIcon={<KeyRound className="w-4 h-4 text-purple-400" />}
             >
               Licence Quotas
@@ -204,10 +201,7 @@ export const SuperAdminDashboard: React.FC<{ onNavigate: (section: string) => vo
         {/* MRR & Licence Growth */}
         <div className="lg:col-span-8 bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-lg space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-extrabold text-white">SaaS Growth & Capacity Scaling</h3>
-              <p className="text-xs text-slate-400">Monthly evolution of licensed workforce seats & platform accounts</p>
-            </div>
+            <h3 className="text-base font-extrabold text-white">SaaS Growth & Capacity Scaling</h3>
             <span className="text-xs font-bold text-purple-400 bg-purple-950/60 px-2.5 py-1 rounded-lg border border-purple-800">
               6-Month Trend
             </span>
@@ -240,10 +234,7 @@ export const SuperAdminDashboard: React.FC<{ onNavigate: (section: string) => vo
 
         {/* Tenant Status Donut */}
         <div className="lg:col-span-4 bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-lg space-y-4">
-          <div>
-            <h3 className="text-base font-extrabold text-white">Customer Account Status</h3>
-            <p className="text-xs text-slate-400">Current lifecycle states across all tenants</p>
-          </div>
+          <h3 className="text-base font-extrabold text-white">Customer Account Status</h3>
 
           <div className="h-48 w-full flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
@@ -281,10 +272,7 @@ export const SuperAdminDashboard: React.FC<{ onNavigate: (section: string) => vo
       {/* Customer Quick Access & Health Table */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-white">Managed Customer Accounts</h3>
-            <p className="text-xs text-slate-400">Fast access to customer HRMS panels & license allocations</p>
-          </div>
+          <h3 className="text-base font-extrabold text-white">Managed Customer Accounts</h3>
           <Button size="sm" variant="ghost" onClick={() => onNavigate('clients')} className="text-purple-400 hover:text-purple-300">
             View All Clients <ArrowUpRight className="w-4 h-4 ml-1" />
           </Button>

@@ -1,7 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Activity, ShieldCheck, Download, Search, Filter } from 'lucide-react';
 import { AuditService } from '../../services/auditService';
 import { Button } from '../../components/common/Button';
+import { PageHeader } from '../../components/common/PageHeader';
 import { exportToExcel } from '../../utils/exportUtils';
 
 export const AuditLogViewer: React.FC = () => {
@@ -39,25 +40,19 @@ export const AuditLogViewer: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">
-            Global SaaS Security & Activity Audit Trail
-          </h2>
-          <p className="text-xs text-slate-400">
-            Immutable system-wide event logs across client creation, licence adjustments, and administrative access
-          </p>
-        </div>
-
-        <Button
-          variant="outline"
-          onClick={handleExport}
-          className="bg-slate-800 text-slate-200 border-slate-700"
-          leftIcon={<Download className="w-4 h-4" />}
-        >
-          Export Audit Trail
-        </Button>
-      </div>
+      <PageHeader
+        title="Audit Logs"
+        actions={
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            className="bg-slate-800 text-slate-200 border-slate-700"
+            leftIcon={<Download className="w-4 h-4" />}
+          >
+            Export Audit Trail
+          </Button>
+        }
+      />
 
       {/* Filter Toolbar */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">

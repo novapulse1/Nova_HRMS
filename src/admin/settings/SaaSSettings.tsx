@@ -1,7 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Sliders, Shield, Save, CheckCircle2, Lock, Server } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
+import { PageHeader } from '../../components/common/PageHeader';
 
 export const SaaSSettings: React.FC = () => {
   const [settings, setSettings] = useState({
@@ -25,14 +26,7 @@ export const SaaSSettings: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100 max-w-4xl">
-      <div>
-        <h2 className="text-xl font-extrabold text-white tracking-tight">
-          NovaPulse SaaS Global System Settings
-        </h2>
-        <p className="text-xs text-slate-400">
-          Core platform parameters, default pricing engines, security boundaries, and cluster topology
-        </p>
-      </div>
+      <PageHeader title="Settings" />
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Section 1: Default Commercial Terms */}

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { KeyRound, Plus, TrendingUp, AlertTriangle, CheckCircle2, History, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TenantService } from '../../services/tenantService';
@@ -6,6 +6,7 @@ import { EmployeeService } from '../../services/employeeService';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
+import { PageHeader } from '../../components/common/PageHeader';
 import { Tenant } from '../../database/schema';
 
 export const LicenceManagement: React.FC = () => {
@@ -37,14 +38,14 @@ export const LicenceManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100">
-      <div>
-        <h2 className="text-xl font-extrabold text-white tracking-tight">
-          Workforce Licence Quotas & Capacity Control
-        </h2>
-        <p className="text-xs text-slate-400">
-          Global SaaS seat allocation, hard limits, capacity thresholds, and change audits
-        </p>
-      </div>
+      <PageHeader
+        title="Licence Management"
+        badge={
+          <span className="text-xs bg-purple-950 text-purple-300 border border-purple-800 font-bold px-2.5 py-0.5 rounded-full">
+            {stats.totalLicences} Total Seats
+          </span>
+        }
+      />
 
       {/* Global Quota KPI Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

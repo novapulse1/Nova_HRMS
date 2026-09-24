@@ -1,9 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck, UserPlus, Key, Mail, Phone, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
+import { PageHeader } from '../../components/common/PageHeader';
 import { StorageEngine, STORAGE_KEYS } from '../../database/storageEngine';
 import { User } from '../../database/schema';
 
@@ -39,25 +40,24 @@ export const AdminUserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">
-            NovaPulse SaaS Super Administrators
-          </h2>
-          <p className="text-xs text-slate-400">
-            Authorized platform operators with unrestricted multi-tenant access
-          </p>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={() => setIsModalOpen(true)}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
-          leftIcon={<UserPlus className="w-4 h-4" />}
-        >
-          Add Super Admin User
-        </Button>
-      </div>
+      <PageHeader
+        title="Admin Users"
+        badge={
+          <span className="text-xs bg-purple-950 text-purple-300 border border-purple-800 font-bold px-2.5 py-0.5 rounded-full">
+            {superAdminUsers.length} Operators
+          </span>
+        }
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => setIsModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
+            leftIcon={<UserPlus className="w-4 h-4" />}
+          >
+            Add Super Admin User
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {superAdminUsers.map(u => (

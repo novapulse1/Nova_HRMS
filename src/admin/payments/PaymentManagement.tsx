@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Receipt, Plus, CheckCircle2, AlertTriangle, Download, DollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TenantService } from '../../services/tenantService';
@@ -7,6 +7,7 @@ import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
+import { PageHeader } from '../../components/common/PageHeader';
 import { exportToExcel } from '../../utils/exportUtils';
 
 export const PaymentManagement: React.FC = () => {
@@ -67,36 +68,30 @@ export const PaymentManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">
-            Customer Invoicing & Payment Register
-          </h2>
-          <p className="text-xs text-slate-400">
-            Track subscription payments, tax invoices (GST), overdue collections, and receipts
-          </p>
-        </div>
+      <PageHeader
+        title="Payments"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              className="bg-slate-800 text-slate-200 border-slate-700"
+              leftIcon={<Download className="w-4 h-4" />}
+            >
+              Export Invoices
+            </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            className="bg-slate-800 text-slate-200 border-slate-700"
-            leftIcon={<Download className="w-4 h-4" />}
-          >
-            Export Invoices
-          </Button>
-
-          <Button
-            variant="primary"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            Record Invoice / Payment
-          </Button>
-        </div>
-      </div>
+            <Button
+              variant="primary"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              Record Invoice / Payment
+            </Button>
+          </div>
+        }
+      />
 
       {/* Payments Table */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">

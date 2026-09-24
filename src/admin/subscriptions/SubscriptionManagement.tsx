@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { CreditCard, Plus, Calendar, CheckCircle2, AlertCircle, TrendingUp, DollarSign } from 'lucide-react';
 import { TenantService } from '../../services/tenantService';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,7 @@ import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
+import { PageHeader } from '../../components/common/PageHeader';
 
 export const SubscriptionManagement: React.FC = () => {
   const { allTenants } = useAuth();
@@ -48,25 +49,19 @@ export const SubscriptionManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">
-            Subscription Plans & Client Billing Cycles
-          </h2>
-          <p className="text-xs text-slate-400">
-            Manage contract periods, recurring renewal schedules, and customer subscriptions
-          </p>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={() => setIsModalOpen(true)}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          Add / Renew Subscription
-        </Button>
-      </div>
+      <PageHeader
+        title="Subscriptions"
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => setIsModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-500 text-white font-bold"
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Add / Renew Subscription
+          </Button>
+        }
+      />
 
       {/* Subscription Table */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
