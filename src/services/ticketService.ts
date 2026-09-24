@@ -42,7 +42,7 @@ export class TicketService {
 
     const newTicket: Ticket = {
       id: `tkt-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       ticketCode,
       employeeId: params.employeeId,
       category: params.category,

@@ -96,7 +96,7 @@ export const SettingsModule: React.FC = () => {
   const handleCreateBranch = (e: React.FormEvent) => {
     e.preventDefault();
     SettingsService.createBranch({
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       ...branchForm,
     });
     setIsBranchModalOpen(false);
@@ -106,7 +106,7 @@ export const SettingsModule: React.FC = () => {
   const handleCreateDept = (e: React.FormEvent) => {
     e.preventDefault();
     SettingsService.createDepartment({
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       ...deptForm,
     });
     setIsDeptModalOpen(false);
@@ -116,7 +116,7 @@ export const SettingsModule: React.FC = () => {
   const handleCreateHoliday = (e: React.FormEvent) => {
     e.preventDefault();
     SettingsService.createHoliday({
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       ...holidayForm,
     });
     setIsHolidayModalOpen(false);

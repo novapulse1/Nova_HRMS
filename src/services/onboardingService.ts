@@ -35,7 +35,7 @@ export class OnboardingService {
 
     const newInvite: OnboardingInvite = {
       id: `onb-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       token,
       candidateName: params.candidateName,
       candidateEmail: params.candidateEmail,
@@ -92,7 +92,7 @@ export class OnboardingService {
     // Create Employee record
     const newEmployee = EmployeeService.create({
       employeeCode,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       branchId: invite.branchId,
       departmentId: invite.departmentId,
       designationId: invite.designationId,
@@ -156,7 +156,7 @@ export class OnboardingService {
     leaveTypes.forEach(lt => {
       StorageEngine.insert(STORAGE_KEYS.LEAVE_BALANCES, {
         id: `lb-${newEmployee.id}-${lt.code.toLowerCase()}`,
-        organizationId: 'org-novapulse-01',
+        organizationId: StorageEngine.getActiveTenantId(),
         employeeId: newEmployee.id,
         leaveTypeId: lt.id,
         year: 2026,

@@ -87,7 +87,7 @@ export class LeaveService {
 
     const newApp: LeaveApplication = {
       id: `la-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       employeeId: params.employeeId,
       leaveTypeId: params.leaveTypeId,
       startDate: params.startDate,
@@ -164,7 +164,7 @@ export class LeaveService {
         } else {
           allAtt.push({
             id: `att-leave-${Date.now()}-${dateStr}`,
-            organizationId: 'org-novapulse-01',
+            organizationId: StorageEngine.getActiveTenantId(),
             employeeId: app.employeeId,
             date: dateStr,
             shiftId: 'shift-gen-01',

@@ -61,7 +61,7 @@ export class AttendanceService {
 
       const newRecord: Attendance = {
         id: `att-${Date.now()}`,
-        organizationId: 'org-novapulse-01',
+        organizationId: StorageEngine.getActiveTenantId(),
         employeeId: params.employeeId,
         date: today,
         shiftId: shift ? shift.id : 'shift-gen-01',
@@ -90,7 +90,7 @@ export class AttendanceService {
       if (!record) {
         record = {
           id: `att-${Date.now()}`,
-          organizationId: 'org-novapulse-01',
+          organizationId: StorageEngine.getActiveTenantId(),
           employeeId: params.employeeId,
           date: today,
           shiftId: shift ? shift.id : 'shift-gen-01',
@@ -152,7 +152,7 @@ export class AttendanceService {
   }): AttendanceRegularization {
     const newReg: AttendanceRegularization = {
       id: `reg-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       employeeId: params.employeeId,
       date: params.date,
       requestedCheckIn: params.requestedCheckIn,
@@ -207,7 +207,7 @@ export class AttendanceService {
       } else {
         StorageEngine.insert<Attendance>(STORAGE_KEYS.ATTENDANCE, {
           id: `att-${Date.now()}`,
-          organizationId: 'org-novapulse-01',
+          organizationId: StorageEngine.getActiveTenantId(),
           employeeId: reg.employeeId,
           date: reg.date,
           shiftId: 'shift-gen-01',

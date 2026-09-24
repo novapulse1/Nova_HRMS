@@ -51,7 +51,7 @@ export class ShiftService {
   }): ShiftSwapRequest {
     const newSwap: ShiftSwapRequest = {
       id: `swap-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       requesterEmployeeId: params.requesterEmployeeId,
       targetEmployeeId: params.targetEmployeeId,
       requesterDate: params.requesterDate,

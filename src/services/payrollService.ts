@@ -161,7 +161,7 @@ export class PayrollService {
 
       const payslip: Payslip = {
         id: `ps-${periodId}-${emp.id}`,
-        organizationId: 'org-novapulse-01',
+        organizationId: StorageEngine.getActiveTenantId(),
         payrollPeriodId: periodId,
         employeeId: emp.id,
         employeeCode: emp.employeeCode,
@@ -221,7 +221,7 @@ export class PayrollService {
 
     const periodRecord: PayrollPeriod = {
       id: periodId,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       month: params.month,
       year: params.year,
       totalWorkingDays,

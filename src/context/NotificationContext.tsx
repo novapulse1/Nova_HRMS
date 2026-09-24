@@ -55,7 +55,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const sendNotification = (notif: Omit<Notification, 'id' | 'organizationId' | 'isRead' | 'createdAt'>) => {
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       ...notif,
       isRead: false,
       createdAt: new Date().toISOString(),

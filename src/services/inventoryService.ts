@@ -51,7 +51,7 @@ export class InventoryService {
     // Record history
     const history: AssetAllocationHistory = {
       id: `ahist-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       assetId: params.assetId,
       employeeId: params.employeeId,
       action: 'ALLOCATED',
@@ -94,7 +94,7 @@ export class InventoryService {
 
     const history: AssetAllocationHistory = {
       id: `ahist-${Date.now()}`,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       assetId: params.assetId,
       employeeId: prevEmployeeId,
       action: 'RETURNED',

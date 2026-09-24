@@ -69,8 +69,11 @@ export const DashboardModule: React.FC<{ onNavigate: (module: string) => void }>
   const inactiveEmployees = employees.filter(e => e.employmentStatus !== 'Active');
 
   const allAttendance = AttendanceService.getAll();
-  const today = '2026-09-21'; // Seed simulation date
-  const todayAttendance = allAttendance.filter(a => a.date === today);
+  const today = new Date().toISOString().split('T')[0];
+  let todayAttendance = allAttendance.filter(a => a.date === today);
+  if (todayAttendance.length === 0) {
+    todayAttendance = allAttendance.filter(a => a.date === '2026-09-21');
+  }
 
   const presentCount = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Work From Home' || a.status === 'On Duty').length;
   const lateCount = todayAttendance.filter(a => a.status === 'Late Arrival').length;

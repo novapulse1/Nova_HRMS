@@ -116,7 +116,7 @@ export const EmployeeModule: React.FC = () => {
 
     EmployeeService.create({
       employeeCode,
-      organizationId: 'org-novapulse-01',
+      organizationId: StorageEngine.getActiveTenantId(),
       branchId: empForm.branchId || branches[0]?.id || 'branch-delhi-01',
       departmentId: empForm.departmentId || departments[0]?.id || 'dept-eng-01',
       designationId: empForm.designationId || designations[0]?.id || 'desig-08',

@@ -122,8 +122,8 @@ export class StorageEngine {
     safeStorage.setItem(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(INITIAL_TENANT_SUBSCRIPTIONS));
     safeStorage.setItem(STORAGE_KEYS.LICENSE_CHANGES, JSON.stringify(INITIAL_TENANT_LICENSE_CHANGES));
     safeStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_TENANT_PAYMENTS));
-    safeStorage.setItem(STORAGE_KEYS.ACTIVE_TENANT_ID, 'NP-000001');
-    safeStorage.setItem(STORAGE_KEYS.APP_ENVIRONMENT, 'super_admin');
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_TENANT_ID, JSON.stringify('NP-000001'));
+    safeStorage.setItem(STORAGE_KEYS.APP_ENVIRONMENT, JSON.stringify('super_admin'));
     safeStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
 
     safeStorage.setItem(STORAGE_KEYS.ORGANIZATION, JSON.stringify(INITIAL_ORGANIZATION));
@@ -152,8 +152,8 @@ export class StorageEngine {
     safeStorage.setItem(STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
     safeStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
     safeStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-    safeStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'user-001'); // Default Super Admin
-    safeStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, 'all');
+    safeStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, JSON.stringify('user-001')); // Default Super Admin
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, JSON.stringify('all'));
 
     this.notifySubscribers('DATABASE_RESET');
   }
@@ -190,9 +190,13 @@ export class StorageEngine {
   public static get<T>(key: string, defaultValue: T): T {
     try {
       const item = safeStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
+      if (item === null || item === undefined) return defaultValue;
+      try {
+        return JSON.parse(item);
+      } catch {
+        return item as unknown as T;
+      }
     } catch (e) {
-      console.error(`Error reading ${key} from storage:`, e);
       return defaultValue;
     }
   }
