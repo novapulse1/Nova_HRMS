@@ -13,6 +13,7 @@ import {
 import { EmployeeService } from './employeeService';
 import { AuditService } from './auditService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { getTenantLoginUrl } from '../config/appConfig';
 
 export class TenantService {
   public static getAll(includeDeleted: boolean = false): Tenant[] {
@@ -84,7 +85,7 @@ export class TenantService {
   }): { tenant: Tenant; adminUser: User } {
     const tenantId = this.generateNextTenantId();
     const clientCode = this.generateClientCode(data.companyName);
-    const loginSlug = `app.novapulse.co.in/t/${tenantId}`;
+    const loginSlug = getTenantLoginUrl(tenantId);
     const now = new Date().toISOString();
 
     const defaultModules = [

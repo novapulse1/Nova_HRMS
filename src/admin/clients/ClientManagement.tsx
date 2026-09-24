@@ -23,6 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TenantService } from '../../services/tenantService';
 import { EmployeeService } from '../../services/employeeService';
 import { Tenant, SubscriptionPlan, PaymentStatus, TenantStatus } from '../../database/schema';
+import { getTenantLoginUrl } from '../../config/appConfig';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
@@ -677,7 +678,7 @@ export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; o
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Login URL</span>
-                <span className="font-mono text-purple-700 font-bold">{selectedTenant.loginSlug}</span>
+                <span className="font-mono text-purple-700 font-bold">{getTenantLoginUrl(selectedTenant.tenantId)}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Account Status</span>

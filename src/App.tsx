@@ -28,9 +28,11 @@ import { GeoLocationModule } from './modules/geo-location/GeoLocationModule';
 import { PayrollModule } from './modules/payroll/PayrollModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
 import { SetupWizardModal } from './components/common/SetupWizardModal';
+import { AccessDeniedScreen } from './components/common/AccessDeniedScreen';
+import { TenantService } from './services/tenantService';
 
 export const AppContent: React.FC = () => {
-  const { appEnvironment, activeTenant } = useAuth();
+  const { appEnvironment, activeTenant, currentUser, setActiveTenantId, setAppEnvironment, isSuperAdmin } = useAuth();
 
   // Super Admin Navigation state
   const [activeAdminSection, setActiveAdminSection] = useState('dashboard');
@@ -39,6 +41,52 @@ export const AppContent: React.FC = () => {
   // Client HRMS Navigation state
   const [activeClientModule, setActiveClientModule] = useState('dashboard');
   const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
+
+  // Tenant Route Inspection (/t/:tenantId)
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const tenantMatch = currentPath.match(/^\/t\/([A-Za-z0-9_-]+)/);
+  const urlTenantId = tenantMatch ? tenantMatch[1].toUpperCase() : null;
+
+  // If user navigates to /t/NP-XXXXXX:
+  if (urlTenantId) {
+    const targetTenant = TenantService.getById(urlTenantId);
+    
+    // Cross-tenant breach check: If logged in user belongs to Tenant A and attempts to access Tenant B
+    if (
+      !isSuperAdmin &&
+      currentUser.organizationId &&
+      currentUser.organizationId !== urlTenantId &&
+      currentUser.organizationId !== targetTenant?.id
+    ) {
+      return (
+        <AccessDeniedScreen
+          attemptedTenantId={urlTenantId}
+          userTenantId={currentUser.organizationId}
+          onGoHome={() => {
+            if (currentUser.organizationId) {
+              setActiveTenantId(currentUser.organizationId);
+              setAppEnvironment('client');
+            }
+          }}
+        />
+      );
+    }
+  }
+
+  React.useEffect(() => {
+    if (urlTenantId) {
+      const targetTenant = TenantService.getById(urlTenantId);
+      if (
+        targetTenant &&
+        (isSuperAdmin || currentUser.organizationId === urlTenantId || currentUser.organizationId === targetTenant.id)
+      ) {
+        if (activeTenant.tenantId !== targetTenant.tenantId) {
+          setActiveTenantId(targetTenant.tenantId);
+          setAppEnvironment('client');
+        }
+      }
+    }
+  }, [urlTenantId, isSuperAdmin, currentUser.organizationId]);
 
   // -------------------------------------------------------------
   // 1. SUPER ADMIN CONTROL ROOM ENVIRONMENT
