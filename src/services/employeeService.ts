@@ -25,14 +25,46 @@ export class EmployeeService {
     return this.getAll().filter(e => e.branchId === branchId);
   }
 
-  public static getDirectReports(managerEmployeeId: string): Employee[] {
-    return this.getAll().filter(e => e.reportingManagerId === managerEmployeeId);
+  public static getLicenceUsage(tenantId: string) {
+    const tenants = StorageEngine.getList<any>(STORAGE_KEYS.TENANTS);
+    const tenant = tenants.find(t => t.id === tenantId || t.tenantId === tenantId) || tenants[0];
+    const total = tenant?.licensedEmployees || 20;
+
+    const all = this.getAll();
+    const active = all.filter(
+      e => (e.organizationId === tenantId || (e as any).tenantId === tenantId || (e as any).organizationId === tenant?.id) &&
+           e.employmentStatus === 'Active'
+    ).length;
+
+    const available = Math.max(0, total - active);
+    const percentage = total > 0 ? Math.round((active / total) * 100) : 0;
+    const isLimitReached = active >= total;
+
+    return {
+      total,
+      used: active,
+      available,
+      percentage,
+      isLimitReached,
+      tenantName: tenant?.companyName || 'NovaPulse Organization'
+    };
   }
 
   public static create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Employee {
+    const tenantId = employee.organizationId || StorageEngine.getActiveTenantId();
+    const usage = this.getLicenceUsage(tenantId);
+
+    // Enforce hard licence limit
+    if (employee.employmentStatus === 'Active' && usage.isLimitReached) {
+      throw new Error(
+        'Your employee licence limit has been reached. Please contact NovaPulse Admin to increase your licence limit.'
+      );
+    }
+
     const id = `emp-${Date.now()}`;
     const newEmp: Employee = {
       ...employee,
+      organizationId: tenantId,
       id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

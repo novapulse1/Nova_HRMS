@@ -1,0 +1,497 @@
+﻿// Multi-Tenant SaaS Master Management Service
+import { StorageEngine, STORAGE_KEYS } from '../database/storageEngine';
+import {
+  Tenant,
+  TenantSubscription,
+  TenantLicenseChange,
+  TenantPayment,
+  SubscriptionPlan,
+  PaymentStatus,
+  User,
+  AuditLog
+} from '../database/schema';
+import { EmployeeService } from './employeeService';
+import { AuditService } from './auditService';
+
+export class TenantService {
+  public static getAll(includeDeleted: boolean = false): Tenant[] {
+    const list = StorageEngine.getList<Tenant>(STORAGE_KEYS.TENANTS);
+    if (includeDeleted) return list;
+    return list.filter(t => !t.isDeleted);
+  }
+
+  public static getById(idOrTenantId: string): Tenant | undefined {
+    const list = this.getAll(true);
+    return list.find(t => t.id === idOrTenantId || t.tenantId === idOrTenantId);
+  }
+
+  public static getByCode(code: string): Tenant | undefined {
+    const list = this.getAll(true);
+    return list.find(t => t.clientCode.toLowerCase() === code.toLowerCase());
+  }
+
+  public static generateNextTenantId(): string {
+    const tenants = this.getAll(true);
+    let maxNum = 0;
+    tenants.forEach(t => {
+      const match = t.tenantId.match(/^NP-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    const nextNum = maxNum + 1;
+    return `NP-${String(nextNum).padStart(6, '0')}`;
+  }
+
+  public static generateClientCode(companyName: string): string {
+    const words = companyName.trim().split(/\s+/);
+    let initials = '';
+    if (words.length >= 2) {
+      initials = (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();
+    } else {
+      initials = companyName.slice(0, 3).toUpperCase();
+    }
+    const count = this.getAll(true).length + 1;
+    return `CLI-${initials}-${String(count).padStart(2, '0')}`;
+  }
+
+  public static create(data: {
+    companyName: string;
+    legalName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    gstin?: string;
+    industry: string;
+    logo?: string;
+    licensedEmployees: number;
+    subscriptionPlan: SubscriptionPlan;
+    subscriptionStartDate: string;
+    subscriptionEndDate: string;
+    trialEndDate?: string;
+    paymentStatus?: PaymentStatus;
+    enabledModules?: string[];
+    primaryAdmin: {
+      name: string;
+      email: string;
+      phone: string;
+    };
+  }): { tenant: Tenant; adminUser: User } {
+    const tenantId = this.generateNextTenantId();
+    const clientCode = this.generateClientCode(data.companyName);
+    const loginSlug = `app.novapulse.co.in/t/${tenantId}`;
+    const now = new Date().toISOString();
+
+    const defaultModules = [
+      'dashboard',
+      'shifts',
+      'attendance',
+      'leaves',
+      'employees',
+      'tickets',
+      'onboarding',
+      'inventory',
+      'geolocation',
+      'payroll',
+      'settings'
+    ];
+
+    const newTenant: Tenant = {
+      id: tenantId,
+      tenantId: tenantId,
+      companyName: data.companyName,
+      legalName: data.legalName || data.companyName,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      country: data.country || 'India',
+      gstin: data.gstin,
+      industry: data.industry || 'Information Technology',
+      logo: data.logo || '/logo.png',
+      clientCode: clientCode,
+      loginSlug: loginSlug,
+      status: data.subscriptionPlan === 'Trial' ? 'TRIAL' : 'ACTIVE',
+      licensedEmployees: Number(data.licensedEmployees) || 20,
+      subscriptionPlan: data.subscriptionPlan,
+      subscriptionStartDate: data.subscriptionStartDate || now.split('T')[0],
+      subscriptionEndDate: data.subscriptionEndDate || now.split('T')[0],
+      trialEndDate: data.trialEndDate,
+      paymentStatus: data.paymentStatus || (data.subscriptionPlan === 'Trial' ? 'PENDING' : 'PAID'),
+      enabledModules: data.enabledModules && data.enabledModules.length > 0 ? data.enabledModules : defaultModules,
+      primaryAdmin: {
+        name: data.primaryAdmin.name,
+        email: data.primaryAdmin.email,
+        phone: data.primaryAdmin.phone,
+        userId: `user-admin-${tenantId.toLowerCase()}`
+      },
+      setupCompleted: false,
+      setupStep: 1,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    StorageEngine.insert<Tenant>(STORAGE_KEYS.TENANTS, newTenant);
+
+    // Create Tenant Primary Admin User
+    const adminUser: User = {
+      id: newTenant.primaryAdmin.userId || `user-${Date.now()}`,
+      organizationId: tenantId,
+      employeeId: `emp-adm-${tenantId.toLowerCase()}`,
+      email: data.primaryAdmin.email,
+      fullName: data.primaryAdmin.name,
+      roleId: 'role-hr-admin',
+      roleName: 'HR Admin',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      status: 'active'
+    };
+    StorageEngine.insert<User>(STORAGE_KEYS.USERS, adminUser);
+
+    // Create Initial Subscription Record
+    const newSub: TenantSubscription = {
+      id: `sub-${Date.now()}`,
+      tenantId: tenantId,
+      companyName: data.companyName,
+      planName: data.subscriptionPlan,
+      billingCycle: data.subscriptionPlan === 'Annual' ? 'Annual' : data.subscriptionPlan === 'Quarterly' ? 'Quarterly' : 'Monthly',
+      startDate: newTenant.subscriptionStartDate,
+      endDate: newTenant.subscriptionEndDate,
+      licensedEmployees: newTenant.licensedEmployees,
+      amount: data.subscriptionPlan === 'Trial' ? 0 : newTenant.licensedEmployees * 120 * (data.subscriptionPlan === 'Annual' ? 12 : 1),
+      currency: 'INR',
+      paymentStatus: newTenant.paymentStatus,
+      renewalDate: newTenant.subscriptionEndDate,
+      notes: 'Initial account provisioning',
+      createdAt: now
+    };
+    StorageEngine.insert<TenantSubscription>(STORAGE_KEYS.SUBSCRIPTIONS, newSub);
+
+    // Create License Change Record
+    const newLicChange: TenantLicenseChange = {
+      id: `lic-${Date.now()}`,
+      tenantId: tenantId,
+      companyName: data.companyName,
+      previousLimit: 0,
+      newLimit: newTenant.licensedEmployees,
+      changedBy: 'Super Admin',
+      reason: 'Initial Account Provisioning',
+      timestamp: now
+    };
+    StorageEngine.insert<TenantLicenseChange>(STORAGE_KEYS.LICENSE_CHANGES, newLicChange);
+
+    // Log Global SaaS Audit
+    AuditService.log({
+      userId: 'user-001',
+      userName: 'Super Admin',
+      userRole: 'Super Admin',
+      module: 'Client Provisioning',
+      action: 'CREATE',
+      description: `Created new customer tenant ${newTenant.companyName} (${tenantId}) with ${newTenant.licensedEmployees} licences [${newTenant.subscriptionPlan} Plan]`,
+      recordId: tenantId
+    });
+
+    return { tenant: newTenant, adminUser };
+  }
+
+  public static update(id: string, updates: Partial<Tenant>): Tenant | undefined {
+    const updated = StorageEngine.update<Tenant>(STORAGE_KEYS.TENANTS, id, {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+    return updated;
+  }
+
+  public static updateLicence(
+    tenantId: string,
+    newLimit: number,
+    changedBy: string,
+    reason: string
+  ): { success: boolean; message: string; tenant?: Tenant } {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return { success: false, message: 'Tenant not found.' };
+
+    const activeEmployees = EmployeeService.getAll().filter(
+      e => (e.organizationId === tenantId || (e as any).tenantId === tenantId) && e.employmentStatus === 'Active'
+    );
+
+    if (newLimit < activeEmployees.length) {
+      return {
+        success: false,
+        message: `Cannot reduce licence to ${newLimit}. Client currently has ${activeEmployees.length} active employees.`
+      };
+    }
+
+    const prev = tenant.licensedEmployees;
+    const updated = this.update(tenant.id, { licensedEmployees: newLimit });
+
+    // Record change log
+    const changeLog: TenantLicenseChange = {
+      id: `lic-${Date.now()}`,
+      tenantId: tenant.tenantId,
+      companyName: tenant.companyName,
+      previousLimit: prev,
+      newLimit: newLimit,
+      changedBy: changedBy || 'Super Admin',
+      reason: reason || 'Licence quota update',
+      timestamp: new Date().toISOString()
+    };
+    StorageEngine.insert<TenantLicenseChange>(STORAGE_KEYS.LICENSE_CHANGES, changeLog);
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: changedBy || 'Super Admin',
+      userRole: 'Super Admin',
+      module: 'Licence Management',
+      action: 'UPDATE',
+      description: `Updated licence limit for ${tenant.companyName} (${tenant.tenantId}) from ${prev} to ${newLimit}. Reason: ${reason}`,
+      recordId: tenantId,
+      previousValue: `${prev}`,
+      newValue: `${newLimit}`
+    });
+
+    return { success: true, message: `Successfully updated licence limit to ${newLimit}`, tenant: updated };
+  }
+
+  public static putOnHold(tenantId: string, reason: string, adminName: string = 'Super Admin'): Tenant | undefined {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return undefined;
+
+    const now = new Date().toISOString();
+    const updated = this.update(tenant.id, {
+      status: 'ON_HOLD',
+      holdDetails: {
+        heldAt: now,
+        heldBy: adminName,
+        reason: reason || 'Account put on hold by administrator'
+      }
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Account Lifecycle',
+      action: 'UPDATE',
+      description: `Account placed ON HOLD for ${tenant.companyName} (${tenantId}). Reason: ${reason}`,
+      recordId: tenantId,
+      previousValue: tenant.status,
+      newValue: 'ON_HOLD'
+    });
+
+    return updated;
+  }
+
+  public static reactivate(tenantId: string, adminName: string = 'Super Admin'): Tenant | undefined {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return undefined;
+
+    const updated = this.update(tenant.id, {
+      status: 'ACTIVE',
+      holdDetails: undefined
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Account Lifecycle',
+      action: 'UPDATE',
+      description: `Account REACTIVATED for ${tenant.companyName} (${tenantId})`,
+      recordId: tenantId,
+      previousValue: tenant.status,
+      newValue: 'ACTIVE'
+    });
+
+    return updated;
+  }
+
+  public static suspend(tenantId: string, reason: string, adminName: string = 'Super Admin'): Tenant | undefined {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return undefined;
+
+    const now = new Date().toISOString();
+    const updated = this.update(tenant.id, {
+      status: 'SUSPENDED',
+      holdDetails: {
+        heldAt: now,
+        heldBy: adminName,
+        reason: reason || 'Suspended by administrator'
+      }
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Account Lifecycle',
+      action: 'UPDATE',
+      description: `Account SUSPENDED for ${tenant.companyName} (${tenantId}). Reason: ${reason}`,
+      recordId: tenantId,
+      previousValue: tenant.status,
+      newValue: 'SUSPENDED'
+    });
+
+    return updated;
+  }
+
+  public static archive(tenantId: string, adminName: string = 'Super Admin'): Tenant | undefined {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return undefined;
+
+    const updated = this.update(tenant.id, {
+      status: 'ARCHIVED'
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Account Lifecycle',
+      action: 'UPDATE',
+      description: `Account ARCHIVED for ${tenant.companyName} (${tenantId})`,
+      recordId: tenantId,
+      previousValue: tenant.status,
+      newValue: 'ARCHIVED'
+    });
+
+    return updated;
+  }
+
+  public static softDelete(tenantId: string, adminName: string = 'Super Admin'): boolean {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return false;
+
+    this.update(tenant.id, {
+      isDeleted: true,
+      deletedAt: new Date().toISOString(),
+      deletedBy: adminName
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Client Provisioning',
+      action: 'DELETE',
+      description: `Soft-deleted client ${tenant.companyName} (${tenantId})`,
+      recordId: tenantId
+    });
+
+    return true;
+  }
+
+  public static permanentDelete(tenantId: string, adminName: string = 'Super Admin'): boolean {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return false;
+
+    StorageEngine.remove<Tenant>(STORAGE_KEYS.TENANTS, tenant.id);
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Client Provisioning',
+      action: 'DELETE',
+      description: `PERMANENTLY DELETED customer records for ${tenant.companyName} (${tenantId})`,
+      recordId: tenantId
+    });
+
+    return true;
+  }
+
+  public static getSubscriptions(tenantId?: string): TenantSubscription[] {
+    const all = StorageEngine.getList<TenantSubscription>(STORAGE_KEYS.SUBSCRIPTIONS);
+    if (tenantId) return all.filter(s => s.tenantId === tenantId);
+    return all;
+  }
+
+  public static createSubscription(sub: Omit<TenantSubscription, 'id' | 'createdAt'>): TenantSubscription {
+    const newSub: TenantSubscription = {
+      ...sub,
+      id: `sub-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    return StorageEngine.insert<TenantSubscription>(STORAGE_KEYS.SUBSCRIPTIONS, newSub);
+  }
+
+  public static updateSubscription(id: string, updates: Partial<TenantSubscription>): TenantSubscription | undefined {
+    return StorageEngine.update<TenantSubscription>(STORAGE_KEYS.SUBSCRIPTIONS, id, updates);
+  }
+
+  public static getLicenseChanges(tenantId?: string): TenantLicenseChange[] {
+    const all = StorageEngine.getList<TenantLicenseChange>(STORAGE_KEYS.LICENSE_CHANGES);
+    if (tenantId) return all.filter(l => l.tenantId === tenantId);
+    return all;
+  }
+
+  public static getPayments(tenantId?: string): TenantPayment[] {
+    const all = StorageEngine.getList<TenantPayment>(STORAGE_KEYS.PAYMENTS);
+    if (tenantId) return all.filter(p => p.tenantId === tenantId);
+    return all;
+  }
+
+  public static createPayment(payment: Omit<TenantPayment, 'id' | 'createdAt'>): TenantPayment {
+    const newPay: TenantPayment = {
+      ...payment,
+      id: `pay-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    return StorageEngine.insert<TenantPayment>(STORAGE_KEYS.PAYMENTS, newPay);
+  }
+
+  public static updatePaymentStatus(id: string, status: PaymentStatus): TenantPayment | undefined {
+    return StorageEngine.update<TenantPayment>(STORAGE_KEYS.PAYMENTS, id, { status });
+  }
+
+  public static getStats() {
+    const tenants = this.getAll();
+    const totalClients = tenants.length;
+    const activeClients = tenants.filter(t => t.status === 'ACTIVE').length;
+    const trialClients = tenants.filter(t => t.status === 'TRIAL').length;
+    const onHoldClients = tenants.filter(t => t.status === 'ON_HOLD').length;
+    const suspendedClients = tenants.filter(t => t.status === 'SUSPENDED').length;
+    const cancelledClients = tenants.filter(t => t.status === 'CANCELLED').length;
+    const archivedClients = tenants.filter(t => t.status === 'ARCHIVED').length;
+
+    const totalLicences = tenants.reduce((acc, t) => acc + (t.licensedEmployees || 0), 0);
+
+    // Calculate active employees across tenants
+    const allEmployees = EmployeeService.getAll();
+    const totalUsedLicences = allEmployees.filter(e => e.employmentStatus === 'Active').length;
+    const availableLicences = Math.max(0, totalLicences - totalUsedLicences);
+    const utilizationPercent = totalLicences > 0 ? Math.round((totalUsedLicences / totalLicences) * 100) : 0;
+
+    // Subscriptions and payments
+    const subs = this.getSubscriptions();
+    const payments = this.getPayments();
+    const mrr = subs.reduce((acc, s) => {
+      if (s.billingCycle === 'Monthly') return acc + (s.amount || 0);
+      if (s.billingCycle === 'Quarterly') return acc + Math.round((s.amount || 0) / 3);
+      if (s.billingCycle === 'Annual') return acc + Math.round((s.amount || 0) / 12);
+      return acc;
+    }, 0);
+
+    const overduePayments = payments.filter(p => p.status === 'OVERDUE').length;
+
+    return {
+      totalClients,
+      activeClients,
+      trialClients,
+      onHoldClients,
+      suspendedClients,
+      cancelledClients,
+      archivedClients,
+      totalLicences,
+      totalUsedLicences,
+      availableLicences,
+      utilizationPercent,
+      mrr,
+      overduePayments
+    };
+  }
+}

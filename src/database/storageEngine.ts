@@ -20,12 +20,24 @@ import {
   INITIAL_SYSTEM_SETTINGS,
   INITIAL_NOTIFICATIONS,
   INITIAL_AUDIT_LOGS,
+  INITIAL_TENANTS,
+  INITIAL_TENANT_SUBSCRIPTIONS,
+  INITIAL_TENANT_LICENSE_CHANGES,
+  INITIAL_TENANT_PAYMENTS,
   generateSeedAttendance,
 } from './seedData';
+import { Tenant, TenantSubscription, TenantLicenseChange, TenantPayment, AdminImpersonationSession } from './schema';
 
 const STORAGE_PREFIX = 'novapulse_hrms_v1_';
 
 export const STORAGE_KEYS = {
+  TENANTS: `${STORAGE_PREFIX}tenants`,
+  SUBSCRIPTIONS: `${STORAGE_PREFIX}subscriptions`,
+  LICENSE_CHANGES: `${STORAGE_PREFIX}license_changes`,
+  PAYMENTS: `${STORAGE_PREFIX}payments`,
+  ACTIVE_TENANT_ID: `${STORAGE_PREFIX}active_tenant_id`,
+  APP_ENVIRONMENT: `${STORAGE_PREFIX}app_environment`, // 'super_admin' | 'client'
+  IMPERSONATION_SESSION: `${STORAGE_PREFIX}impersonation_session`,
   ORGANIZATION: `${STORAGE_PREFIX}organization`,
   BRANCHES: `${STORAGE_PREFIX}branches`,
   DEPARTMENTS: `${STORAGE_PREFIX}departments`,
@@ -69,6 +81,14 @@ export class StorageEngine {
   }
 
   public static resetToDefaults() {
+    localStorage.setItem(STORAGE_KEYS.TENANTS, JSON.stringify(INITIAL_TENANTS));
+    localStorage.setItem(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify(INITIAL_TENANT_SUBSCRIPTIONS));
+    localStorage.setItem(STORAGE_KEYS.LICENSE_CHANGES, JSON.stringify(INITIAL_TENANT_LICENSE_CHANGES));
+    localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_TENANT_PAYMENTS));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_TENANT_ID, 'NP-000001');
+    localStorage.setItem(STORAGE_KEYS.APP_ENVIRONMENT, 'super_admin');
+    localStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
+
     localStorage.setItem(STORAGE_KEYS.ORGANIZATION, JSON.stringify(INITIAL_ORGANIZATION));
     localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(INITIAL_BRANCHES));
     localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(INITIAL_DEPARTMENTS));
@@ -99,6 +119,35 @@ export class StorageEngine {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH_ID, 'all');
 
     this.notifySubscribers('DATABASE_RESET');
+  }
+
+  public static getActiveTenantId(): string {
+    return this.get<string>(STORAGE_KEYS.ACTIVE_TENANT_ID, 'NP-000001');
+  }
+
+  public static setActiveTenantId(tenantId: string): void {
+    this.set(STORAGE_KEYS.ACTIVE_TENANT_ID, tenantId);
+  }
+
+  public static getAppEnvironment(): 'super_admin' | 'client' {
+    return this.get<'super_admin' | 'client'>(STORAGE_KEYS.APP_ENVIRONMENT, 'super_admin');
+  }
+
+  public static setAppEnvironment(env: 'super_admin' | 'client'): void {
+    this.set(STORAGE_KEYS.APP_ENVIRONMENT, env);
+  }
+
+  public static getImpersonationSession(): AdminImpersonationSession | null {
+    return this.get<AdminImpersonationSession | null>(STORAGE_KEYS.IMPERSONATION_SESSION, null);
+  }
+
+  public static setImpersonationSession(session: AdminImpersonationSession | null): void {
+    if (session) {
+      this.set(STORAGE_KEYS.IMPERSONATION_SESSION, session);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
+      this.notifySubscribers(STORAGE_KEYS.IMPERSONATION_SESSION);
+    }
   }
 
   public static get<T>(key: string, defaultValue: T): T {

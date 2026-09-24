@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   setIsOpen,
 }) => {
-  const { currentUser, can, isSuperAdmin, isHR, isManager } = useAuth();
+  const { currentUser, can, isSuperAdmin, isHR, isManager, activeTenant } = useAuth();
 
   // Dynamic counts for badges
   const pendingLeaves = LeaveService.getApplications().filter(a => a.status === 'pending').length;
@@ -129,8 +129,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  // Filter items based on user's permissions
+  // Filter items based on tenant plan enabled modules and user's permissions
   const visibleItems = navigationItems.filter(item => {
+    if (activeTenant?.enabledModules && activeTenant.enabledModules.length > 0) {
+      if (!activeTenant.enabledModules.includes(item.moduleKey)) return false;
+    }
     if (isSuperAdmin) return true;
     return can(item.moduleKey, 'view');
   });
@@ -152,13 +155,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         {/* Brand Header */}
-        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60">
-          <div className="flex items-center gap-3">
+        <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60">
+          <div className="flex items-center gap-2.5 overflow-hidden">
             <img
               src="/logo.png"
               alt="NovaPulse"
-              className="h-9 w-auto max-w-[180px] object-contain"
+              className="h-8 w-auto max-w-[120px] object-contain shrink-0"
             />
+            <div className="overflow-hidden">
+              <div className="text-[11px] font-extrabold text-white truncate leading-tight">
+                {activeTenant?.companyName || 'NovaPulse'}
+              </div>
+              <div className="text-[10px] text-purple-400 font-mono font-bold truncate">
+                {activeTenant?.tenantId || 'NP-000001'}
+              </div>
+            </div>
           </div>
         </div>
 

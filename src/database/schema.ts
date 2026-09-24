@@ -58,6 +58,136 @@ export type AssetStatus = 'Available' | 'Allocated' | 'Maintenance' | 'Disposed'
 
 export type PayrollStatus = 'Draft' | 'Calculated' | 'Under Review' | 'Approved' | 'Finalized' | 'Paid';
 
+export type TenantStatus = 
+  | 'ACTIVE'
+  | 'TRIAL'
+  | 'PAYMENT_PENDING'
+  | 'ON_HOLD'
+  | 'SUSPENDED'
+  | 'CANCELLED'
+  | 'ARCHIVED';
+
+export type PaymentStatus = 
+  | 'PAID'
+  | 'PARTIALLY_PAID'
+  | 'PENDING'
+  | 'OVERDUE'
+  | 'WAIVED'
+  | 'REFUNDED';
+
+export type SubscriptionPlan = 
+  | 'Trial'
+  | 'Monthly'
+  | 'Quarterly'
+  | 'Half-Yearly'
+  | 'Annual'
+  | 'Enterprise Custom';
+
+// -------------------------------------------------------------
+// MULTI-TENANT SAAS ENTITIES
+// -------------------------------------------------------------
+
+export interface Tenant {
+  id: string; // "NP-000001"
+  tenantId: string; // "NP-000001"
+  companyName: string;
+  legalName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  gstin?: string;
+  industry: string;
+  logo: string;
+  clientCode: string; // "CLI-001"
+  loginSlug: string; // "app.novapulse.co.in/t/NP-000001"
+  status: TenantStatus;
+  licensedEmployees: number;
+  subscriptionPlan: SubscriptionPlan;
+  subscriptionStartDate: string;
+  subscriptionEndDate: string;
+  trialEndDate?: string;
+  paymentStatus: PaymentStatus;
+  enabledModules: string[];
+  primaryAdmin: {
+    name: string;
+    email: string;
+    phone: string;
+    userId?: string;
+  };
+  setupCompleted: boolean;
+  setupStep: number;
+  holdDetails?: {
+    heldAt: string;
+    heldBy: string;
+    reason: string;
+  };
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TenantSubscription {
+  id: string;
+  tenantId: string;
+  companyName: string;
+  planName: SubscriptionPlan;
+  billingCycle: 'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Annual' | 'Custom';
+  startDate: string;
+  endDate: string;
+  licensedEmployees: number;
+  amount: number;
+  currency: string;
+  paymentStatus: PaymentStatus;
+  renewalDate: string;
+  paymentReference?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface TenantLicenseChange {
+  id: string;
+  tenantId: string;
+  companyName: string;
+  previousLimit: number;
+  newLimit: number;
+  changedBy: string;
+  reason: string;
+  timestamp: string;
+}
+
+export interface TenantPayment {
+  id: string;
+  invoiceNumber: string;
+  tenantId: string;
+  companyName: string;
+  plan: string;
+  amount: number;
+  taxAmount: number;
+  totalAmount: number;
+  paymentDate: string;
+  dueDate: string;
+  status: PaymentStatus;
+  paymentMethod: string;
+  transactionId?: string;
+  createdAt: string;
+}
+
+export interface AdminImpersonationSession {
+  id: string;
+  superAdminId: string;
+  superAdminName: string;
+  tenantId: string;
+  companyName: string;
+  startedAt: string;
+  endedAt?: string;
+  reason?: string;
+}
+
 // -------------------------------------------------------------
 // CORE ENTITIES
 // -------------------------------------------------------------
