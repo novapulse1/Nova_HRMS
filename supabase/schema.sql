@@ -76,9 +76,9 @@ CREATE INDEX IF NOT EXISTS idx_tenants_tenant_id ON tenants (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants (status);
 
 -- -------------------------------------------------------------
--- 3. CORE TABLE: TENANT USERS & PROFILES (Linked to Supabase Auth)
+-- 3. CORE TABLE: USER_PROFILES (Linked to Supabase Auth)
 -- -------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS tenant_users (
+CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id UUID UNIQUE, -- REFERENCES auth.users(id) ON DELETE CASCADE
   tenant_id VARCHAR(32) NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
@@ -93,9 +93,12 @@ CREATE TABLE IF NOT EXISTS tenant_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tenant_users_auth_user_id ON tenant_users (auth_user_id);
-CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant_id ON tenant_users (tenant_id);
-CREATE INDEX IF NOT EXISTS idx_tenant_users_email ON tenant_users (email);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_auth_user_id ON user_profiles (auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_tenant_id ON user_profiles (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles (email);
+
+-- Backward compatibility view if referenced as tenant_users
+CREATE OR REPLACE VIEW tenant_users AS SELECT * FROM user_profiles;
 
 -- -------------------------------------------------------------
 -- 4. CORE TABLE: DEPARTMENTS
@@ -199,8 +202,7 @@ CREATE INDEX IF NOT EXISTS idx_employees_manager ON employees (reporting_manager
 
 -- -------------------------------------------------------------
 -- 8. DATABASE TRIGGER: STRICT EMPLOYEE LICENCE LIMIT ENFORCEMENT
--- The frontend is NEVER trusted alone. This trigger rejects any insert/update
--- that exceeds the customer's paid licence limit.
+-- Enforced at the PostgreSQL level to prevent any breach.
 -- -------------------------------------------------------------
 CREATE OR REPLACE FUNCTION enforce_tenant_licence_limit()
 RETURNS TRIGGER AS $$
@@ -219,10 +221,10 @@ BEGIN
   END IF;
 
   IF v_tenant_status IN ('ON_HOLD', 'SUSPENDED', 'CANCELLED', 'ARCHIVED') THEN
-    RAISE EXCEPTION 'Tenant % is currently %: Employee creation is disabled while account is not active.', NEW.tenant_id, v_tenant_status;
+    RAISE EXCEPTION 'Tenant % is currently %: Employee operations blocked while account is on hold.', NEW.tenant_id, v_tenant_status;
   END IF;
 
-  -- 2. Count active employees for this tenant (excluding current record on UPDATE)
+  -- 2. Count active employees for this tenant
   IF (TG_OP = 'INSERT') OR (TG_OP = 'UPDATE' AND OLD.employment_status NOT IN ('Active', 'Probation', 'Notice') AND NEW.employment_status IN ('Active', 'Probation', 'Notice')) THEN
     IF NEW.employment_status IN ('Active', 'Probation', 'Notice') THEN
       SELECT COUNT(*) INTO v_active_count
@@ -232,7 +234,7 @@ BEGIN
         AND (TG_OP = 'INSERT' OR id <> NEW.id);
 
       IF (v_active_count + 1) > v_licence_limit THEN
-        RAISE EXCEPTION 'Licence quota exceeded for Tenant %: Capacity limit is % seats, currently using % active seats. Please upgrade licences in Super Admin Panel.',
+        RAISE EXCEPTION 'Licence quota exceeded for Tenant %: Capacity is % seats, currently using % active seats. Please upgrade licences in Super Admin Panel.',
           NEW.tenant_id, v_licence_limit, v_active_count;
       END IF;
     END IF;
@@ -271,9 +273,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id ON subscriptions (tenant_id);
 
 -- -------------------------------------------------------------
--- 10. CORE TABLE: LICENCES (Audit & Quota Tracking)
+-- 10. CORE TABLE: TENANT_LICENSES (Audit & Quota Tracking)
 -- -------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS licences (
+CREATE TABLE IF NOT EXISTS tenant_licenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id VARCHAR(32) NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   previous_limit INT NOT NULL,
@@ -283,7 +285,10 @@ CREATE TABLE IF NOT EXISTS licences (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_licences_tenant_id ON licences (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_licenses_tenant_id ON tenant_licenses (tenant_id);
+
+-- Backward compatibility view if referenced as licences
+CREATE OR REPLACE VIEW licences AS SELECT * FROM tenant_licenses;
 
 -- -------------------------------------------------------------
 -- 11. CORE TABLE: ATTENDANCE
@@ -321,12 +326,12 @@ CREATE TABLE IF NOT EXISTS leave_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id VARCHAR(32) NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type VARCHAR(64) NOT NULL, -- 'Casual Leave', 'Sick Leave', 'Earned Leave', etc.
+  leave_type VARCHAR(64) NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   total_days NUMERIC(4,1) NOT NULL DEFAULT 1.0,
   reason TEXT NOT NULL,
-  status VARCHAR(32) NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'cancelled'
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
   approved_by UUID REFERENCES employees(id) ON DELETE SET NULL,
   approved_at TIMESTAMPTZ,
   rejection_reason TEXT,
@@ -362,7 +367,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_tenant_id ON tickets (tenant_id);
 
 -- -------------------------------------------------------------
--- 14. CORE TABLE: INVENTORY (Asset Master)
+-- 14. CORE TABLE: INVENTORY
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS inventory (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -387,7 +392,7 @@ CREATE TABLE IF NOT EXISTS inventory (
 CREATE INDEX IF NOT EXISTS idx_inventory_tenant_id ON inventory (tenant_id);
 
 -- -------------------------------------------------------------
--- 15. CORE TABLE: PAYROLL (Payslips & Salary Computations)
+-- 15. CORE TABLE: PAYROLL
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS payroll (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -415,11 +420,11 @@ CREATE TABLE IF NOT EXISTS payroll (
 CREATE INDEX IF NOT EXISTS idx_payroll_tenant_id ON payroll (tenant_id);
 
 -- -------------------------------------------------------------
--- 16. CORE TABLE: AUDIT LOGS (Immutable Activity Trail)
+-- 16. CORE TABLE: AUDIT_LOGS (Immutable Activity Trail)
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id VARCHAR(32) NOT NULL, -- "GLOBAL" for Super Admin platform events or "NP-000001"
+  tenant_id VARCHAR(32) NOT NULL,
   user_id VARCHAR(64) NOT NULL,
   user_name VARCHAR(255) NOT NULL,
   user_role VARCHAR(64) NOT NULL,
@@ -427,6 +432,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action VARCHAR(128) NOT NULL,
   description TEXT NOT NULL,
   record_id VARCHAR(64),
+  previous_value TEXT,
+  new_value TEXT,
   ip_address VARCHAR(64) DEFAULT '127.0.0.1',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -462,7 +469,7 @@ DECLARE
   v_role user_role_level;
 BEGIN
   SELECT role INTO v_role
-  FROM tenant_users
+  FROM user_profiles
   WHERE auth_user_id = auth.uid()
   LIMIT 1;
   RETURN COALESCE(v_role, 'employee'::user_role_level);
@@ -476,7 +483,7 @@ DECLARE
   v_tenant_id VARCHAR(32);
 BEGIN
   SELECT tenant_id INTO v_tenant_id
-  FROM tenant_users
+  FROM user_profiles
   WHERE auth_user_id = auth.uid()
   LIMIT 1;
   RETURN v_tenant_id;
@@ -499,8 +506,8 @@ DECLARE
 BEGIN
   SELECT e.id INTO v_emp_id
   FROM employees e
-  JOIN tenant_users tu ON tu.employee_id = e.employee_code AND tu.tenant_id = e.tenant_id
-  WHERE tu.auth_user_id = auth.uid()
+  JOIN user_profiles up ON up.employee_id = e.employee_code AND up.tenant_id = e.tenant_id
+  WHERE up.auth_user_id = auth.uid()
   LIMIT 1;
   RETURN v_emp_id;
 END;
@@ -508,13 +515,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Enable RLS on all tables
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tenant_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE licences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
@@ -534,6 +541,19 @@ CREATE POLICY p_tenants_super_admin ON tenants
 DROP POLICY IF EXISTS p_tenants_client_read ON tenants;
 CREATE POLICY p_tenants_client_read ON tenants
   FOR SELECT
+  USING (tenant_id = get_current_user_tenant_id());
+
+-- -------------------------------------------------------------
+-- RLS POLICIES FOR USER_PROFILES
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS p_user_profiles_super_admin ON user_profiles;
+CREATE POLICY p_user_profiles_super_admin ON user_profiles
+  FOR ALL
+  USING (is_super_admin());
+
+DROP POLICY IF EXISTS p_user_profiles_tenant ON user_profiles;
+CREATE POLICY p_user_profiles_tenant ON user_profiles
+  FOR ALL
   USING (tenant_id = get_current_user_tenant_id());
 
 -- -------------------------------------------------------------
@@ -587,67 +607,23 @@ CREATE POLICY p_branches_super_admin ON branches FOR ALL USING (is_super_admin()
 DROP POLICY IF EXISTS p_branches_tenant ON branches;
 CREATE POLICY p_branches_tenant ON branches FOR ALL USING (tenant_id = get_current_user_tenant_id());
 
-DROP POLICY IF EXISTS p_shifts_super_admin ON shifts;
-CREATE POLICY p_shifts_super_admin ON shifts FOR ALL USING (is_super_admin());
+-- -------------------------------------------------------------
+-- RLS POLICIES FOR SUBSCRIPTIONS & TENANT_LICENSES
+-- -------------------------------------------------------------
+DROP POLICY IF EXISTS p_subs_super_admin ON subscriptions;
+CREATE POLICY p_subs_super_admin ON subscriptions FOR ALL USING (is_super_admin());
 
-DROP POLICY IF EXISTS p_shifts_tenant ON shifts;
-CREATE POLICY p_shifts_tenant ON shifts FOR ALL USING (tenant_id = get_current_user_tenant_id());
+DROP POLICY IF EXISTS p_subs_tenant ON subscriptions;
+CREATE POLICY p_subs_tenant ON subscriptions FOR SELECT USING (tenant_id = get_current_user_tenant_id());
+
+DROP POLICY IF EXISTS p_licenses_super_admin ON tenant_licenses;
+CREATE POLICY p_licenses_super_admin ON tenant_licenses FOR ALL USING (is_super_admin());
+
+DROP POLICY IF EXISTS p_licenses_tenant ON tenant_licenses;
+CREATE POLICY p_licenses_tenant ON tenant_licenses FOR SELECT USING (tenant_id = get_current_user_tenant_id());
 
 -- -------------------------------------------------------------
--- RLS POLICIES FOR ATTENDANCE & LEAVE REQUESTS
--- -------------------------------------------------------------
-DROP POLICY IF EXISTS p_attendance_super_admin ON attendance;
-CREATE POLICY p_attendance_super_admin ON attendance FOR ALL USING (is_super_admin());
-
-DROP POLICY IF EXISTS p_attendance_client_admin ON attendance;
-CREATE POLICY p_attendance_client_admin ON attendance FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND get_current_user_role() IN ('client_admin'::user_role_level, 'manager'::user_role_level));
-
-DROP POLICY IF EXISTS p_attendance_employee ON attendance;
-CREATE POLICY p_attendance_employee ON attendance FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND employee_id = get_current_user_employee_id());
-
-DROP POLICY IF EXISTS p_leave_super_admin ON leave_requests;
-CREATE POLICY p_leave_super_admin ON leave_requests FOR ALL USING (is_super_admin());
-
-DROP POLICY IF EXISTS p_leave_client_admin ON leave_requests;
-CREATE POLICY p_leave_client_admin ON leave_requests FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND get_current_user_role() IN ('client_admin'::user_role_level, 'manager'::user_role_level));
-
-DROP POLICY IF EXISTS p_leave_employee ON leave_requests;
-CREATE POLICY p_leave_employee ON leave_requests FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND employee_id = get_current_user_employee_id());
-
--- -------------------------------------------------------------
--- RLS POLICIES FOR TICKETS, INVENTORY, PAYROLL
--- -------------------------------------------------------------
-DROP POLICY IF EXISTS p_tickets_super_admin ON tickets;
-CREATE POLICY p_tickets_super_admin ON tickets FOR ALL USING (is_super_admin());
-
-DROP POLICY IF EXISTS p_tickets_tenant ON tickets;
-CREATE POLICY p_tickets_tenant ON tickets FOR ALL
-  USING (tenant_id = get_current_user_tenant_id());
-
-DROP POLICY IF EXISTS p_inventory_super_admin ON inventory;
-CREATE POLICY p_inventory_super_admin ON inventory FOR ALL USING (is_super_admin());
-
-DROP POLICY IF EXISTS p_inventory_tenant ON inventory;
-CREATE POLICY p_inventory_tenant ON inventory FOR ALL
-  USING (tenant_id = get_current_user_tenant_id());
-
-DROP POLICY IF EXISTS p_payroll_super_admin ON payroll;
-CREATE POLICY p_payroll_super_admin ON payroll FOR ALL USING (is_super_admin());
-
-DROP POLICY IF EXISTS p_payroll_client_admin ON payroll;
-CREATE POLICY p_payroll_client_admin ON payroll FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND get_current_user_role() = 'client_admin'::user_role_level);
-
-DROP POLICY IF EXISTS p_payroll_employee ON payroll;
-CREATE POLICY p_payroll_employee ON payroll FOR SELECT
-  USING (tenant_id = get_current_user_tenant_id() AND employee_id = get_current_user_employee_id());
-
--- -------------------------------------------------------------
--- RLS POLICIES FOR AUDIT LOGS & NOTIFICATIONS
+-- RLS POLICIES FOR AUDIT LOGS
 -- -------------------------------------------------------------
 DROP POLICY IF EXISTS p_audit_super_admin ON audit_logs;
 CREATE POLICY p_audit_super_admin ON audit_logs FOR ALL USING (is_super_admin());
@@ -655,7 +631,3 @@ CREATE POLICY p_audit_super_admin ON audit_logs FOR ALL USING (is_super_admin())
 DROP POLICY IF EXISTS p_audit_tenant ON audit_logs;
 CREATE POLICY p_audit_tenant ON audit_logs FOR SELECT
   USING (tenant_id = get_current_user_tenant_id());
-
-DROP POLICY IF EXISTS p_notifications_user ON notifications;
-CREATE POLICY p_notifications_user ON notifications FOR ALL
-  USING (tenant_id = get_current_user_tenant_id() AND user_id = auth.uid()::text);

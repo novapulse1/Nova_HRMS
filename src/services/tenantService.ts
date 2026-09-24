@@ -1,4 +1,4 @@
-﻿// Multi-Tenant SaaS Master Management Service
+// Multi-Tenant SaaS Master Management Service
 import { StorageEngine, STORAGE_KEYS } from '../database/storageEngine';
 import {
   Tenant,
@@ -12,6 +12,7 @@ import {
 } from '../database/schema';
 import { EmployeeService } from './employeeService';
 import { AuditService } from './auditService';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 export class TenantService {
   public static getAll(includeDeleted: boolean = false): Tenant[] {
@@ -194,6 +195,59 @@ export class TenantService {
       description: `Created new customer tenant ${newTenant.companyName} (${tenantId}) with ${newTenant.licensedEmployees} licences [${newTenant.subscriptionPlan} Plan]`,
       recordId: tenantId
     });
+
+    // Sync to Supabase PostgreSQL database if configured
+    if (isSupabaseConfigured()) {
+      supabase.from('tenants').insert({
+        tenant_id: tenantId,
+        company_name: newTenant.companyName,
+        legal_name: newTenant.legalName,
+        email: newTenant.email,
+        phone: newTenant.phone,
+        address: newTenant.address,
+        city: newTenant.city,
+        state: newTenant.state,
+        country: newTenant.country,
+        gstin: newTenant.gstin,
+        industry: newTenant.industry,
+        licensed_employees: newTenant.licensedEmployees,
+        subscription_plan: newTenant.subscriptionPlan,
+        subscription_start_date: newTenant.subscriptionStartDate,
+        subscription_end_date: newTenant.subscriptionEndDate,
+        payment_status: newTenant.paymentStatus,
+        status: newTenant.status,
+        login_slug: newTenant.loginSlug,
+        client_code: newTenant.clientCode,
+      }).then(({ error }) => {
+        if (error) console.error('Supabase tenant insert error:', error);
+      });
+
+      supabase.from('subscriptions').insert({
+        tenant_id: tenantId,
+        plan_name: newSub.planName,
+        billing_cycle: newSub.billingCycle,
+        start_date: newSub.startDate,
+        end_date: newSub.endDate,
+        licensed_employees: newSub.licensedEmployees,
+        amount: newSub.amount,
+        currency: newSub.currency,
+        payment_status: newSub.paymentStatus,
+        renewal_date: newSub.renewalDate,
+        notes: newSub.notes,
+      }).then(({ error }) => {
+        if (error) console.error('Supabase subscription insert error:', error);
+      });
+
+      supabase.from('tenant_licenses').insert({
+        tenant_id: tenantId,
+        previous_limit: newLicChange.previousLimit,
+        new_limit: newLicChange.newLimit,
+        changed_by: newLicChange.changedBy,
+        reason: newLicChange.reason,
+      }).then(({ error }) => {
+        if (error) console.error('Supabase license insert error:', error);
+      });
+    }
 
     return { tenant: newTenant, adminUser };
   }

@@ -2,11 +2,11 @@
 // NovaPulse HRMS — Supabase Client Setup
 // Single Project Multi-Tenant SaaS Connection
 // ====================================================================
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const metaEnv = (import.meta as any).env || {};
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+const metaEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+const supabaseUrl = metaEnv.VITE_SUPABASE_URL || process?.env?.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || process?.env?.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
@@ -17,8 +17,19 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
+// Polyfill minimal WebSocket for Node test runners if missing
+if (typeof window === 'undefined' && typeof (globalThis as any).WebSocket === 'undefined') {
+  (globalThis as any).WebSocket = class MockWebSocket {
+    constructor() {}
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 // Create the Supabase client with safe fallback
-export const supabase = isSupabaseConfigured()
+export const supabase: SupabaseClient = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,

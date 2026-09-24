@@ -46,9 +46,9 @@ export class SupabaseAuthService {
           return { success: false, message: 'Authentication failed: User not found.' };
         }
 
-        // Fetch tenant user profile from tenant_users table
+        // Fetch tenant user profile from user_profiles table
         const { data: profile, error: profileError } = await supabase
-          .from('tenant_users')
+          .from('user_profiles')
           .select('*, tenants(*)')
           .eq('auth_user_id', authUser.id)
           .single();
@@ -193,9 +193,9 @@ export class SupabaseAuthService {
           return { success: false, message: error.message };
         }
 
-        // Insert into tenant_users table
+        // Insert into user_profiles table
         const { data: profile, error: insertError } = await supabase
-          .from('tenant_users')
+          .from('user_profiles')
           .insert({
             auth_user_id: data.user?.id,
             tenant_id: params.tenantId,

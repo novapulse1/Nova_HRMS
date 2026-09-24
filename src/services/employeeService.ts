@@ -1,6 +1,7 @@
-// Employee Master & Lifecycle Service
+// Employee Master & Lifecycle Service with Supabase PostgreSQL Integration
 import { StorageEngine, STORAGE_KEYS } from '../database/storageEngine';
 import { Employee } from '../database/schema';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 export class EmployeeService {
   public static getAll(): Employee[] {
@@ -54,7 +55,7 @@ export class EmployeeService {
     const tenantId = employee.organizationId || StorageEngine.getActiveTenantId();
     const usage = this.getLicenceUsage(tenantId);
 
-    // Enforce hard licence limit
+    // Enforce hard licence limit at backend level
     if (employee.employmentStatus === 'Active' && usage.isLimitReached) {
       throw new Error(
         'Your employee licence limit has been reached. Please contact NovaPulse Admin to increase your licence limit.'
@@ -69,18 +70,73 @@ export class EmployeeService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    return StorageEngine.insert<Employee>(STORAGE_KEYS.EMPLOYEES, newEmp);
+
+    const inserted = StorageEngine.insert<Employee>(STORAGE_KEYS.EMPLOYEES, newEmp);
+
+    // Sync to Supabase PostgreSQL table if configured
+    if (isSupabaseConfigured()) {
+      supabase.from('employees').insert({
+        tenant_id: tenantId,
+        employee_code: newEmp.employeeCode,
+        first_name: newEmp.firstName,
+        last_name: newEmp.lastName,
+        email: newEmp.email,
+        phone: newEmp.phone,
+        personal_email: newEmp.personalEmail,
+        dob: newEmp.dob,
+        gender: newEmp.gender,
+        joining_date: newEmp.joiningDate,
+        employment_type: newEmp.employmentType,
+        employment_status: newEmp.employmentStatus,
+        salary_structure: newEmp.salaryStructure,
+        bank_details: newEmp.bankDetails,
+        statutory_details: newEmp.statutoryDetails,
+        emergency_contact: newEmp.emergencyContact,
+        avatar_url: newEmp.avatarUrl,
+        is_active: newEmp.employmentStatus === 'Active',
+      }).then(({ error }) => {
+        if (error) console.error('Supabase employee insert error:', error);
+      });
+    }
+
+    return inserted;
   }
 
   public static update(id: string, updates: Partial<Employee>): Employee | undefined {
-    return StorageEngine.update<Employee>(STORAGE_KEYS.EMPLOYEES, id, {
+    const updated = StorageEngine.update<Employee>(STORAGE_KEYS.EMPLOYEES, id, {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+
+    if (isSupabaseConfigured() && updated) {
+      supabase.from('employees').update({
+        employment_status: updated.employmentStatus,
+        is_active: updated.employmentStatus === 'Active',
+        first_name: updated.firstName,
+        last_name: updated.lastName,
+        email: updated.email,
+        phone: updated.phone,
+      }).eq('employee_code', updated.employeeCode)
+        .then(({ error }) => {
+          if (error) console.error('Supabase employee update error:', error);
+        });
+    }
+
+    return updated;
   }
 
   public static delete(id: string): boolean {
-    return StorageEngine.remove<Employee>(STORAGE_KEYS.EMPLOYEES, id);
+    const emp = this.getById(id);
+    const removed = StorageEngine.remove<Employee>(STORAGE_KEYS.EMPLOYEES, id);
+
+    if (isSupabaseConfigured() && emp) {
+      supabase.from('employees').delete().eq('employee_code', emp.employeeCode)
+        .then(({ error }) => {
+          if (error) console.error('Supabase employee delete error:', error);
+        });
+    }
+
+    return removed;
   }
 
   public static updateStatus(
