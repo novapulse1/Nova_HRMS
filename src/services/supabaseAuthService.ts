@@ -30,20 +30,42 @@ export class SupabaseAuthService {
     isAccountOnHold?: boolean;
     message?: string;
   }> {
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return { success: false, message: 'Please enter your email or user ID.' };
+    }
+
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password: password || 'NovaPulse@2026',
         });
 
         if (error) {
-          return { success: false, message: error.message };
+          AuditService.log({
+            organizationId: 'NP-000001',
+            userName: cleanEmail,
+            userRole: 'Anonymous',
+            module: 'Authentication',
+            action: 'LOGIN_FAILED',
+            description: `Authentication failed for ${cleanEmail}: ${error.message}`,
+          });
+          return { success: false, message: 'Invalid credentials. Please verify your email and password.' };
         }
 
         const authUser = data.user;
         if (!authUser) {
-          return { success: false, message: 'Authentication failed: User not found.' };
+          AuditService.log({
+            organizationId: 'NP-000001',
+            userName: cleanEmail,
+            userRole: 'Anonymous',
+            module: 'Authentication',
+            action: 'LOGIN_FAILED',
+            description: `Authentication failed for ${cleanEmail}: User record not found`,
+          });
+          return { success: false, message: 'Authentication failed: User record not found.' };
         }
 
         // Fetch tenant user profile from user_profiles table
@@ -54,6 +76,14 @@ export class SupabaseAuthService {
           .single();
 
         if (profileError || !profile) {
+          AuditService.log({
+            organizationId: 'NP-000001',
+            userName: cleanEmail,
+            userRole: 'Anonymous',
+            module: 'Authentication',
+            action: 'LOGIN_FAILED',
+            description: `Profile missing for authenticated auth_user_id ${authUser.id}`,
+          });
           return {
             success: false,
             message: 'User profile or tenant association not found in database.',
@@ -64,12 +94,14 @@ export class SupabaseAuthService {
         const isOnHold = ['ON_HOLD', 'SUSPENDED', 'CANCELLED'].includes(tenantData?.status);
 
         AuditService.log({
+          organizationId: profile.tenant_id,
           tenantId: profile.tenant_id,
+          userId: profile.id,
           userName: profile.full_name,
           userRole: profile.role,
           module: 'Authentication',
-          action: 'LOGIN',
-          description: `User ${profile.email} logged in to tenant ${profile.tenant_id} (Status: ${tenantData?.status || 'ACTIVE'})`,
+          action: 'LOGIN_SUCCESS',
+          description: `User ${profile.email} authenticated successfully for tenant ${profile.tenant_id} (Status: ${tenantData?.status || 'ACTIVE'})`,
         });
 
         return {
@@ -90,7 +122,7 @@ export class SupabaseAuthService {
           isAccountOnHold: isOnHold,
         };
       } catch (err: any) {
-        return { success: false, message: err.message || 'Supabase authentication error' };
+        return { success: false, message: 'Authentication error occurred. Please try again.' };
       }
     }
 
@@ -99,8 +131,23 @@ export class SupabaseAuthService {
     const tenants = StorageEngine.getList<Tenant>(STORAGE_KEYS.TENANTS);
 
     const matchedUser = users.find(
-      u => u.email.toLowerCase() === email.toLowerCase() || u.id === email
-    ) || users[0];
+      u => u.email.toLowerCase() === cleanEmail || u.id.toLowerCase() === cleanEmail
+    );
+
+    if (!matchedUser) {
+      AuditService.log({
+        organizationId: 'NP-000001',
+        userName: cleanEmail,
+        userRole: 'Anonymous',
+        module: 'Authentication',
+        action: 'LOGIN_FAILED',
+        description: `Authentication failed for ${cleanEmail}: Account not found`,
+      });
+      return {
+        success: false,
+        message: 'Invalid credentials. Please verify your email and password.',
+      };
+    }
 
     const matchedTenant = tenants.find(
       t => t.tenantId === matchedUser.organizationId || t.id === matchedUser.organizationId
@@ -116,6 +163,17 @@ export class SupabaseAuthService {
     };
 
     const isHold = ['ON_HOLD', 'SUSPENDED', 'CANCELLED'].includes(matchedTenant.status);
+
+    AuditService.log({
+      organizationId: matchedTenant.tenantId,
+      tenantId: matchedTenant.tenantId,
+      userId: matchedUser.id,
+      userName: matchedUser.fullName,
+      userRole: matchedUser.roleName,
+      module: 'Authentication',
+      action: 'LOGIN_SUCCESS',
+      description: `User ${matchedUser.email} authenticated successfully for tenant ${matchedTenant.tenantId} (Status: ${matchedTenant.status})`,
+    });
 
     return {
       success: true,
@@ -136,31 +194,104 @@ export class SupabaseAuthService {
   }
 
   /**
+   * Get Current Supabase Auth Session
+   */
+  public static async getSession(): Promise<any | null> {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        return data.session;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Sign out current user
    */
   public static async signOut(): Promise<void> {
     if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('Supabase sign out error:', err);
+      }
     }
+    AuditService.log({
+      organizationId: StorageEngine.getActiveTenantId(),
+      module: 'Authentication',
+      action: 'LOGOUT',
+      description: 'User successfully signed out of session',
+    });
   }
 
   /**
    * Send Password Reset Request
    */
   public static async resetPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, message: 'Please provide a valid email address.' };
+    }
+
     if (isSupabaseConfigured()) {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: window.location.origin + '/reset-password',
       });
       if (error) {
         return { success: false, message: error.message };
       }
-      return { success: true, message: `Password reset link sent to ${email}.` };
+      AuditService.log({
+        organizationId: StorageEngine.getActiveTenantId(),
+        userName: cleanEmail,
+        userRole: 'Anonymous',
+        module: 'Authentication',
+        action: 'PASSWORD_RESET_REQUEST',
+        description: `Password reset link requested for ${cleanEmail}`,
+      });
+      return { success: true, message: `Password reset link sent to ${cleanEmail}.` };
     }
+
+    AuditService.log({
+      organizationId: StorageEngine.getActiveTenantId(),
+      userName: cleanEmail,
+      userRole: 'Anonymous',
+      module: 'Authentication',
+      action: 'PASSWORD_RESET_REQUEST',
+      description: `Password reset link requested for ${cleanEmail} (Simulation Mode)`,
+    });
+
     return {
       success: true,
-      message: `Password reset link sent to ${email} (Simulation Mode).`,
+      message: `Password reset link sent to ${cleanEmail}. Check your inbox to set a new password.`,
     };
+  }
+
+  /**
+   * Update password for authenticated user
+   */
+  public static async updatePassword(newPassword: string): Promise<{ success: boolean; message: string }> {
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, message: 'Password must be at least 8 characters long.' };
+    }
+
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    AuditService.log({
+      organizationId: StorageEngine.getActiveTenantId(),
+      module: 'Authentication',
+      action: 'PASSWORD_CHANGED',
+      description: 'User password was updated securely',
+    });
+
+    return { success: true, message: 'Password updated successfully.' };
   }
 
   /**

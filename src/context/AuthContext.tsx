@@ -19,6 +19,12 @@ interface AuthContextType {
   switchUser: (userId: string) => void;
   can: (module: string, action: keyof PermissionSet) => boolean;
 
+  // Authentication State & Security Gate
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
+
   // Role Access Levels
   isSuperAdmin: boolean;
   isClientAdmin: boolean;
@@ -38,15 +44,22 @@ interface AuthContextType {
   isImpersonating: boolean;
 
   // Supabase Auth Methods
-  signIn: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  signIn: (email: string, password?: string, hostContext?: any) => Promise<{ success: boolean; message?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   isSupabaseActive: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticatedState] = useState<boolean>(() =>
+    StorageEngine.isAuthenticated()
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const [currentUser, setCurrentUserState] = useState<User>(() => AuthService.getCurrentUser());
   const [availableUsers, setAvailableUsers] = useState<User[]>(() => AuthService.getUsers());
   const [appEnvironment, setAppEnvironmentState] = useState<'super_admin' | 'client'>(() =>
@@ -60,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsub = StorageEngine.subscribe(() => {
+      setIsAuthenticatedState(StorageEngine.isAuthenticated());
       setCurrentUserState(AuthService.getCurrentUser());
       setAvailableUsers(AuthService.getUsers());
       setAppEnvironmentState(StorageEngine.getAppEnvironment());
@@ -89,9 +103,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const roles = AuthService.getRoles();
   const userRole = roles.find(r => r.name === currentUser.roleName || r.id === currentUser.roleId);
 
+  const clearAuthError = () => setAuthError(null);
+
   const switchUser = (userId: string) => {
     const u = AuthService.setCurrentUser(userId);
     setCurrentUserState(u);
+    StorageEngine.setAuthenticated(true);
+    setIsAuthenticatedState(true);
+
     // Securely align tenant to authenticated user's organizationId
     if (u.organizationId && u.organizationId !== 'NP-000001' && u.roleName !== 'Super Admin') {
       const t = TenantService.getById(u.organizationId);
@@ -116,6 +135,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { session, clientUser } = AuthService.loginAsClient(tenantId, currentUser, reason);
     setImpersonationSessionState(session);
     setCurrentUserState(clientUser);
+    StorageEngine.setAuthenticated(true);
+    setIsAuthenticatedState(true);
     setAppEnvironmentState('client');
     const t = AuthService.getActiveTenant();
     setActiveTenantState(t);
@@ -129,10 +150,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveTenantState(AuthService.getActiveTenant());
   };
 
-  const signIn = async (email: string, password?: string) => {
-    const res = await SupabaseAuthService.signIn(email, password);
-    if (res.success && res.user) {
-      // Find matching local user or adapt
+  const signIn = async (
+    email: string,
+    password?: string,
+    hostContext?: any
+  ): Promise<{ success: boolean; message?: string }> => {
+    setIsLoading(true);
+    setAuthError(null);
+
+    try {
+      const res = await SupabaseAuthService.signIn(email, password);
+
+      if (!res.success || !res.user) {
+        setAuthError(res.message || 'Invalid credentials.');
+        return { success: false, message: res.message || 'Invalid credentials.' };
+      }
+
+      const userRoleName =
+        res.user.role === 'super_admin'
+          ? 'Super Admin'
+          : res.user.role === 'client_admin'
+          ? 'HR Admin'
+          : res.user.role === 'manager'
+          ? 'Manager'
+          : 'Employee';
+
+      const isUserSuperAdmin =
+        res.user.role === 'super_admin' || userRoleName === 'Super Admin';
+
+      // 1. Platform Mode Check (makemypayroll.com)
+      if (hostContext && hostContext.mode === 'platform') {
+        if (!isUserSuperAdmin) {
+          const errMsg = 'Super Admin privileges required. Client organization users must log in at their dedicated subdomain portal.';
+          setAuthError(errMsg);
+          return { success: false, message: errMsg };
+        }
+      }
+
+      // 2. Tenant Subdomain Mode Check (ignite.makemypayroll.com or /t/:tenantId)
+      if (hostContext && (hostContext.mode === 'tenant' || hostContext.mode === 'legacy')) {
+        const targetTenant = hostContext.tenant;
+        if (targetTenant && !isUserSuperAdmin) {
+          const userOrg = res.user.tenantId;
+          const isMatch =
+            userOrg &&
+            (userOrg === targetTenant.tenantId ||
+             userOrg === targetTenant.id ||
+             (targetTenant.slug && userOrg.toLowerCase() === targetTenant.slug.toLowerCase()) ||
+             (targetTenant.subdomain && userOrg.toLowerCase() === targetTenant.subdomain.toLowerCase()));
+
+          if (!isMatch) {
+            const errMsg = 'Unauthorized Organization Access: Your account does not belong to this organization.';
+            setAuthError(errMsg);
+            return { success: false, message: errMsg };
+          }
+        }
+      }
+
+      // Build User Object
       const u: User = {
         id: res.user.id,
         organizationId: res.user.tenantId,
@@ -140,38 +215,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: res.user.email,
         fullName: res.user.fullName,
         roleId: `role-${res.user.role}`,
-        roleName: res.user.role === 'super_admin' ? 'Super Admin' : res.user.role === 'client_admin' ? 'HR Admin' : res.user.role === 'manager' ? 'Manager' : 'Employee',
+        roleName: userRoleName,
         avatar: res.user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
         status: 'active',
       };
+
       setCurrentUserState(u);
       StorageEngine.set(STORAGE_KEYS.CURRENT_USER_ID, u.id);
+      StorageEngine.setAuthenticated(true);
+      setIsAuthenticatedState(true);
 
       if (res.tenant) {
         setActiveTenantState(res.tenant);
         StorageEngine.setActiveTenantId(res.tenant.tenantId);
       }
 
-      if (res.user.role === 'super_admin') {
+      if (isUserSuperAdmin && (!hostContext || hostContext.mode === 'platform')) {
         setAppEnvironment('super_admin');
       } else {
         setAppEnvironment('client');
       }
 
       return { success: true };
+    } catch (err: any) {
+      const errMsg = err.message || 'Authentication error';
+      setAuthError(errMsg);
+      return { success: false, message: errMsg };
+    } finally {
+      setIsLoading(false);
     }
-    return { success: false, message: res.message || 'Login failed' };
   };
 
   const signOut = async () => {
-    await SupabaseAuthService.signOut();
-    StorageEngine.setActiveTenantId('NP-000001');
-    StorageEngine.setAppEnvironment('super_admin');
-    setCurrentUserState(availableUsers[0]);
+    setIsLoading(true);
+    try {
+      await SupabaseAuthService.signOut();
+    } finally {
+      StorageEngine.setAuthenticated(false);
+      setIsAuthenticatedState(false);
+      setImpersonationSessionState(null);
+      StorageEngine.setImpersonationSession(null);
+      setIsLoading(false);
+    }
   };
 
   const resetPassword = async (email: string) => {
     return SupabaseAuthService.resetPassword(email);
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    return SupabaseAuthService.updatePassword(newPassword);
   };
 
   const can = (module: string, action: keyof PermissionSet): boolean => {
@@ -179,7 +272,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return AuthService.hasPermission(module, action, currentUser.roleName);
   };
 
-  const isSuperAdmin = currentUser.roleName === 'Super Admin' || appEnvironment === 'super_admin';
+  const isSuperAdmin =
+    currentUser.roleName === 'Super Admin' ||
+    currentUser.roleId === 'role-super-admin' ||
+    (currentUser as any).role === 'super_admin';
   const isClientAdmin = isSuperAdmin || currentUser.roleName === 'HR Admin' || currentUser.roleName === 'Payroll Admin' || currentUser.roleName === 'IT Admin';
   const isHR = isSuperAdmin || currentUser.roleName === 'HR Admin' || currentUser.roleName === 'HR Executive';
   const isManager = isSuperAdmin || isHR || currentUser.roleName === 'Manager' || currentUser.roleName === 'Team Leader';
@@ -195,6 +291,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         availableUsers,
         switchUser,
         can,
+        isAuthenticated,
+        isLoading,
+        authError,
+        clearAuthError,
         isSuperAdmin,
         isClientAdmin,
         isHR,
@@ -212,6 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         resetPassword,
+        updatePassword,
         isSupabaseActive: isSupabaseConfigured(),
       }}
     >

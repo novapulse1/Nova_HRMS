@@ -66,6 +66,7 @@ export const STORAGE_KEYS = {
   AUDIT_LOGS: `${STORAGE_PREFIX}audit_logs`,
   CURRENT_USER_ID: `${STORAGE_PREFIX}current_user_id`,
   ACTIVE_BRANCH_ID: `${STORAGE_PREFIX}active_branch_id`,
+  IS_AUTHENTICATED: `${STORAGE_PREFIX}is_authenticated`,
 };
 
 const inMemoryStorage: Record<string, string> = {};
@@ -185,6 +186,14 @@ export class StorageEngine {
       safeStorage.removeItem(STORAGE_KEYS.IMPERSONATION_SESSION);
       this.notifySubscribers(STORAGE_KEYS.IMPERSONATION_SESSION);
     }
+  }
+
+  public static isAuthenticated(): boolean {
+    return this.get<boolean>(STORAGE_KEYS.IS_AUTHENTICATED, true);
+  }
+
+  public static setAuthenticated(authenticated: boolean): void {
+    this.set(STORAGE_KEYS.IS_AUTHENTICATED, authenticated);
   }
 
   public static get<T>(key: string, defaultValue: T): T {

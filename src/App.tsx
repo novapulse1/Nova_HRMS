@@ -29,10 +29,25 @@ import { PayrollModule } from './modules/payroll/PayrollModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
 import { SetupWizardModal } from './components/common/SetupWizardModal';
 import { AccessDeniedScreen } from './components/common/AccessDeniedScreen';
+import { TenantNotFoundScreen } from './components/common/TenantNotFoundScreen';
+import { AccountOnHoldScreen } from './components/common/AccountOnHoldScreen';
+import { SecurityGateLoading } from './components/common/SecurityGateLoading';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { TenantService } from './services/tenantService';
+import { TenantResolver } from './services/tenantResolver';
+import { TenantHostService } from './services/tenantHostService';
 
 export const AppContent: React.FC = () => {
-  const { appEnvironment, activeTenant, currentUser, setActiveTenantId, setAppEnvironment, isSuperAdmin } = useAuth();
+  const {
+    appEnvironment,
+    activeTenant,
+    currentUser,
+    setActiveTenantId,
+    setAppEnvironment,
+    isSuperAdmin,
+    isAuthenticated,
+    isLoading
+  } = useAuth();
 
   // Super Admin Navigation state
   const [activeAdminSection, setActiveAdminSection] = useState('dashboard');
@@ -42,26 +57,54 @@ export const AppContent: React.FC = () => {
   const [activeClientModule, setActiveClientModule] = useState('dashboard');
   const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
 
-  // Tenant Route Inspection (/t/:tenantId)
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-  const tenantMatch = currentPath.match(/^\/t\/([A-Za-z0-9_-]+)/);
-  const urlTenantId = tenantMatch ? tenantMatch[1].toUpperCase() : null;
+  // Centralized Multi-Tenant Hostname & Path Resolution
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const currentPathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const resolvedTenantContext = TenantHostService.resolve(currentHostname, currentPathname);
 
-  // If user navigates to /t/NP-XXXXXX:
-  if (urlTenantId) {
-    const targetTenant = TenantService.getById(urlTenantId);
-    
-    // Cross-tenant breach check: If logged in user belongs to Tenant A and attempts to access Tenant B
-    if (
-      !isSuperAdmin &&
-      currentUser.organizationId &&
-      currentUser.organizationId !== urlTenantId &&
-      currentUser.organizationId !== targetTenant?.id
-    ) {
+  // 1. Unknown Subdomain or Invalid /t/ path
+  if (resolvedTenantContext.error === 'TENANT_NOT_FOUND' || resolvedTenantContext.status === 'NOT_FOUND') {
+    return (
+      <TenantNotFoundScreen
+        subdomain={resolvedTenantContext.subdomain}
+        identifier={resolvedTenantContext.pathTenantId || undefined}
+      />
+    );
+  }
+
+  // 2. Security Gate Loading state
+  if (isLoading) {
+    return <SecurityGateLoading />;
+  }
+
+  // 3. Unauthenticated User Gate (Renders context-specific Login)
+  if (!isAuthenticated) {
+    return <LoginScreen tenantContext={resolvedTenantContext} />;
+  }
+
+  // 4. Tenant Context Resolution & Boundary Enforcement
+  const targetTenant = resolvedTenantContext.tenant;
+
+  if (targetTenant) {
+    // Block operational access if tenant account is on hold, suspended, or cancelled
+    if (targetTenant.status === 'ON_HOLD' || targetTenant.status === 'SUSPENDED' || targetTenant.status === 'CANCELLED') {
+      return <AccountOnHoldScreen />;
+    }
+
+    const userOrgId = currentUser.organizationId;
+    const isOwnerOfTenant =
+      userOrgId &&
+      (userOrgId === targetTenant.tenantId ||
+       userOrgId === targetTenant.id ||
+       (targetTenant.slug && userOrgId.toLowerCase() === targetTenant.slug.toLowerCase()) ||
+       (targetTenant.subdomain && userOrgId.toLowerCase() === targetTenant.subdomain.toLowerCase()));
+
+    // Cross-tenant boundary check: If logged in user belongs to Tenant A and attempts to access Tenant B
+    if (!isSuperAdmin && userOrgId && !isOwnerOfTenant) {
       return (
         <AccessDeniedScreen
-          attemptedTenantId={urlTenantId}
-          userTenantId={currentUser.organizationId}
+          attemptedTenantId={targetTenant.companyName || targetTenant.tenantId}
+          userTenantId={userOrgId}
           onGoHome={() => {
             if (currentUser.organizationId) {
               setActiveTenantId(currentUser.organizationId);
@@ -74,24 +117,27 @@ export const AppContent: React.FC = () => {
   }
 
   React.useEffect(() => {
-    if (urlTenantId) {
-      const targetTenant = TenantService.getById(urlTenantId);
-      if (
-        targetTenant &&
-        (isSuperAdmin || currentUser.organizationId === urlTenantId || currentUser.organizationId === targetTenant.id)
-      ) {
-        if (activeTenant.tenantId !== targetTenant.tenantId) {
-          setActiveTenantId(targetTenant.tenantId);
-          setAppEnvironment('client');
-        }
+    if (targetTenant) {
+      const userOrgId = currentUser.organizationId;
+      const isAuthorized =
+        isSuperAdmin ||
+        (userOrgId &&
+          (userOrgId === targetTenant.tenantId ||
+           userOrgId === targetTenant.id ||
+           (targetTenant.slug && userOrgId.toLowerCase() === targetTenant.slug.toLowerCase())));
+
+      if (isAuthorized && activeTenant.tenantId !== targetTenant.tenantId) {
+        setActiveTenantId(targetTenant.tenantId);
+        setAppEnvironment('client');
       }
     }
-  }, [urlTenantId, isSuperAdmin, currentUser.organizationId]);
+  }, [targetTenant?.tenantId, isSuperAdmin, currentUser.organizationId]);
+
 
   // -------------------------------------------------------------
-  // 1. SUPER ADMIN CONTROL ROOM ENVIRONMENT
+  // 1. SUPER ADMIN CONTROL ROOM ENVIRONMENT (Strict Role Enforcement)
   // -------------------------------------------------------------
-  if (appEnvironment === 'super_admin') {
+  if (appEnvironment === 'super_admin' && isSuperAdmin) {
     const renderAdminContent = () => {
       switch (activeAdminSection) {
         case 'dashboard':

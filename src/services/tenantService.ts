@@ -13,7 +13,8 @@ import {
 import { EmployeeService } from './employeeService';
 import { AuditService } from './auditService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { getTenantLoginUrl } from '../config/appConfig';
+import { getTenantLoginUrl, getTenantSubdomainUrl } from '../config/appConfig';
+import { normalizeSlug, isValidSlugFormat, isReservedSlug } from './tenantResolver';
 
 export class TenantService {
   public static getAll(includeDeleted: boolean = false): Tenant[] {
@@ -27,9 +28,84 @@ export class TenantService {
     return list.find(t => t.id === idOrTenantId || t.tenantId === idOrTenantId);
   }
 
+  public static getBySlug(slug: string): Tenant | undefined {
+    if (!slug) return undefined;
+    const list = this.getAll(true);
+    const cleanSlug = slug.toLowerCase().trim();
+    return list.find(
+      t => (t.slug && t.slug.toLowerCase() === cleanSlug) || (t.subdomain && t.subdomain.toLowerCase() === cleanSlug) || t.tenantId.toLowerCase() === cleanSlug
+    );
+  }
+
+  public static getBySubdomain(subdomain: string): Tenant | undefined {
+    return this.getBySlug(subdomain);
+  }
+
   public static getByCode(code: string): Tenant | undefined {
     const list = this.getAll(true);
     return list.find(t => t.clientCode.toLowerCase() === code.toLowerCase());
+  }
+
+  public static slugExists(slug: string, excludeTenantId?: string): boolean {
+    if (!slug) return false;
+    const list = this.getAll(true);
+    const cleanSlug = slug.toLowerCase().trim();
+    return list.some(
+      t =>
+        t.id !== excludeTenantId &&
+        t.tenantId !== excludeTenantId &&
+        ((t.slug && t.slug.toLowerCase() === cleanSlug) || (t.subdomain && t.subdomain.toLowerCase() === cleanSlug) || t.tenantId.toLowerCase() === cleanSlug)
+    );
+  }
+
+  public static subdomainExists(subdomain: string, excludeTenantId?: string): boolean {
+    return this.slugExists(subdomain, excludeTenantId);
+  }
+
+  public static generateSlug(companyName: string): string {
+    const stripped = companyName
+      .replace(/\b(pvt|ltd|limited|private|llp|inc|solutions|technologies|services|infotech|group|corp|corporation)\b/gi, '')
+      .trim();
+    const base = normalizeSlug(stripped) || normalizeSlug(companyName) || 'client';
+
+    let candidate = base;
+    let counter = 1;
+    while (this.slugExists(candidate) || isReservedSlug(candidate)) {
+      counter++;
+      candidate = `${base}-${counter}`;
+    }
+    return candidate;
+  }
+
+  public static generateSubdomain(companyName: string): string {
+    return this.generateSlug(companyName);
+  }
+
+  public static validateSlug(slug: string, excludeTenantId?: string): { valid: boolean; error?: string } {
+    if (!slug || typeof slug !== 'string') {
+      return { valid: false, error: 'Subdomain / slug is required.' };
+    }
+    const clean = slug.toLowerCase().trim();
+    if (clean.length < 2) {
+      return { valid: false, error: 'Subdomain must be at least 2 characters long.' };
+    }
+    if (clean.length > 63) {
+      return { valid: false, error: 'Subdomain cannot exceed 63 characters.' };
+    }
+    if (!isValidSlugFormat(clean)) {
+      return { valid: false, error: 'Subdomain must contain only lowercase letters, numbers, and single hyphens.' };
+    }
+    if (isReservedSlug(clean)) {
+      return { valid: false, error: `"${clean}" is a reserved system subdomain and cannot be used.` };
+    }
+    if (this.slugExists(clean, excludeTenantId)) {
+      return { valid: false, error: 'Subdomain already exists. Please choose another.' };
+    }
+    return { valid: true };
+  }
+
+  public static validateSubdomain(subdomain: string, excludeTenantId?: string): { valid: boolean; error?: string } {
+    return this.validateSlug(subdomain, excludeTenantId);
   }
 
   public static generateNextTenantId(): string {
@@ -61,6 +137,8 @@ export class TenantService {
   public static create(data: {
     companyName: string;
     legalName: string;
+    slug?: string;
+    subdomain?: string;
     email: string;
     phone: string;
     address: string;
@@ -85,7 +163,19 @@ export class TenantService {
   }): { tenant: Tenant; adminUser: User } {
     const tenantId = this.generateNextTenantId();
     const clientCode = this.generateClientCode(data.companyName);
-    const loginSlug = getTenantLoginUrl(tenantId);
+    
+    // Resolve slug / subdomain
+    const rawSubdomain = data.subdomain || data.slug;
+    let slug = rawSubdomain ? normalizeSlug(rawSubdomain) : this.generateSlug(data.companyName);
+    const slugValidation = this.validateSlug(slug);
+    if (!slugValidation.valid) {
+      if (rawSubdomain) {
+        throw new Error(slugValidation.error || 'Invalid subdomain');
+      }
+      slug = this.generateSlug(data.companyName);
+    }
+
+    const loginSlug = getTenantSubdomainUrl(slug);
     const now = new Date().toISOString();
 
     const defaultModules = [
@@ -117,6 +207,8 @@ export class TenantService {
       industry: data.industry || 'Information Technology',
       logo: data.logo || '/logo.png',
       clientCode: clientCode,
+      slug: slug,
+      subdomain: slug,
       loginSlug: loginSlug,
       status: data.subscriptionPlan === 'Trial' ? 'TRIAL' : 'ACTIVE',
       licensedEmployees: Number(data.licensedEmployees) || 20,
@@ -218,6 +310,7 @@ export class TenantService {
         payment_status: newTenant.paymentStatus,
         status: newTenant.status,
         login_slug: newTenant.loginSlug,
+        slug: newTenant.slug,
         client_code: newTenant.clientCode,
       }).then(({ error }) => {
         if (error) console.error('Supabase tenant insert error:', error);

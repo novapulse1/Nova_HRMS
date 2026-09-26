@@ -13,6 +13,7 @@ import {
   Settings,
   ChevronRight,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -35,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   setIsOpen,
 }) => {
-  const { currentUser, can, isSuperAdmin, isHR, isManager, activeTenant } = useAuth();
+  const { currentUser, can, isSuperAdmin, isHR, isManager, activeTenant, signOut } = useAuth();
 
   // Dynamic counts for badges
   const pendingLeaves = LeaveService.getApplications().filter(a => a.status === 'pending').length;
@@ -243,9 +244,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Footer Support Info */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 text-[11px] text-slate-400">
-          <div className="flex items-center justify-between">
+        {/* Footer Support Info & Sign Out */}
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/40 space-y-2">
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/60 hover:bg-rose-950/60 hover:border-rose-800/60 border border-slate-700/60 text-slate-300 hover:text-rose-200 text-xs font-bold transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <LogOut className="w-4 h-4 text-slate-400 group-hover:text-rose-400" />
+              <span>Sign Out</span>
+            </div>
+          </button>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
             <span className="font-semibold text-slate-300">NovaPulse</span>
             <span className="text-emerald-400 font-bold flex items-center gap-1">
               <i className="fa-solid fa-cloud-bolt text-[10px]"></i> Live Sync

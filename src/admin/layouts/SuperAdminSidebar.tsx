@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   LayoutDashboard,
   Building2,
@@ -11,7 +11,8 @@ import {
   Settings,
   ChevronRight,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TenantService } from '../../services/tenantService';
@@ -30,7 +31,7 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({
   isOpen,
   setIsOpen,
 }) => {
-  const { currentUser, setAppEnvironment, allTenants, setActiveTenantId } = useAuth();
+  const { currentUser, setAppEnvironment, allTenants, setActiveTenantId, signOut } = useAuth();
 
   const stats = TenantService.getStats();
 
@@ -191,7 +192,7 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({
           })}
         </div>
 
-        {/* Footer: Switch to Client Panel */}
+        {/* Footer: Switch to Client Panel & Sign Out */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-900/60 space-y-2">
           <button
             onClick={() => {
@@ -205,6 +206,16 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({
               <span>Open Client HRMS</span>
             </div>
             <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/60 hover:bg-rose-950/60 hover:border-rose-800/60 border border-slate-700/60 text-slate-300 hover:text-rose-200 text-xs font-bold transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <LogOut className="w-4 h-4 text-slate-400 group-hover:text-rose-400" />
+              <span>Sign Out</span>
+            </div>
           </button>
 
           <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 pt-1">

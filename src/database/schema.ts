@@ -102,7 +102,10 @@ export interface Tenant {
   industry: string;
   logo: string;
   clientCode: string; // "CLI-001"
-  loginSlug: string; // "app.novapulse.co.in/t/NP-000001"
+  slug: string; // "ignite"
+  subdomain?: string; // "ignite"
+  customDomain?: string; // "hrms.ignite.com"
+  loginSlug: string; // "https://ignite.makemypayroll.com" or "app.novapulse.co.in/t/NP-000001"
   status: TenantStatus;
   licensedEmployees: number;
   subscriptionPlan: SubscriptionPlan;
@@ -768,6 +771,28 @@ export interface Notification {
   createdAt: string;
 }
 
+export type AuditAction =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'EXPORT'
+  | 'LOGIN'
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'PASSWORD_RESET_REQUEST'
+  | 'PASSWORD_CHANGED'
+  | 'TENANT_ACCESS_DENIED'
+  | 'TENANT_MISMATCH'
+  | 'ACCOUNT_SUSPENDED_ACCESS_ATTEMPT'
+  | 'ACCOUNT_ON_HOLD_ACCESS_ATTEMPT'
+  | 'PROCESS'
+  | 'IMPERSONATE'
+  | 'EXIT_IMPERSONATION'
+  | (string & {});
+
 export interface AuditLog {
   id: string;
   organizationId: string;
@@ -776,7 +801,7 @@ export interface AuditLog {
   userName: string;
   userRole: string;
   module: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'EXPORT' | 'LOGIN' | 'PROCESS' | 'IMPERSONATE' | 'EXIT_IMPERSONATION';
+  action: AuditAction;
   description: string;
   recordId?: string;
   previousValue?: string;

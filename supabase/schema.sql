@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS tenants (
   subscription_end_date DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
   payment_status payment_status_type NOT NULL DEFAULT 'PAID',
   status tenant_status_type NOT NULL DEFAULT 'ACTIVE',
-  login_slug VARCHAR(128) UNIQUE NOT NULL, -- e.g. "app.novapulse.co.in/login?tenant=NP-000001"
+  login_slug VARCHAR(128) UNIQUE NOT NULL, -- e.g. "https://novapulse.pulsebazar.shop"
+  slug VARCHAR(64) UNIQUE, -- e.g. "ignite", "razor"
   client_code VARCHAR(32) NOT NULL, -- e.g. "INFOTECH"
   custom_domain VARCHAR(255),
   logo_url TEXT,
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tenants_tenant_id ON tenants (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants (slug);
 CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants (status);
 
 -- -------------------------------------------------------------

@@ -1,6 +1,8 @@
 import React from 'react';
 import { ShieldAlert, ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { TenantService } from '../../services/tenantService';
+import { ROOT_DOMAIN, getTenantSubdomainUrl } from '../../config/appConfig';
 import { Button } from './Button';
 
 interface AccessDeniedScreenProps {
@@ -15,6 +17,21 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
   onGoHome,
 }) => {
   const { signOut, currentUser, activeTenant } = useAuth();
+  const effectiveUserTenantId = userTenantId || activeTenant.tenantId;
+  const userTenant = TenantService.getById(effectiveUserTenantId);
+
+  const handleReturnToWorkspace = () => {
+    if (typeof window !== 'undefined') {
+      const isSubdomain = window.location.hostname.includes('.') && !['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (userTenant?.slug && isSubdomain) {
+        window.location.href = getTenantSubdomainUrl(userTenant.slug);
+        return;
+      }
+      window.history.pushState({}, '', `/t/${effectiveUserTenantId}`);
+      if (onGoHome) onGoHome();
+      else window.location.reload();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
@@ -28,9 +45,9 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
         </h1>
 
         <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-          You are currently signed in as <span className="font-semibold text-slate-200">{currentUser.fullName}</span> ({currentUser.email}) with authorization restricted to company tenant <span className="font-mono text-purple-400 font-bold">{userTenantId || activeTenant.tenantId}</span>.
+          You are currently signed in as <span className="font-semibold text-slate-200">{currentUser.fullName}</span> ({currentUser.email}) with authorization restricted to company tenant <span className="font-mono text-purple-400 font-bold">{userTenant?.companyName || effectiveUserTenantId}</span>.
           <br /><br />
-          Cross-company access to tenant <span className="font-mono text-red-400 font-bold">{attemptedTenantId}</span> has been blocked by NovaPulse Multi-Tenant Security Engine.
+          Cross-company access to workspace <span className="font-mono text-red-400 font-bold">{attemptedTenantId}</span> has been blocked by NovaPulse Multi-Tenant Security Engine.
         </p>
 
         <div className="space-y-3">
@@ -38,11 +55,7 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
             variant="primary"
             className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold"
             leftIcon={<ArrowLeft className="w-4 h-4" />}
-            onClick={() => {
-              window.history.pushState({}, '', `/t/${userTenantId || activeTenant.tenantId}`);
-              if (onGoHome) onGoHome();
-              else window.location.reload();
-            }}
+            onClick={handleReturnToWorkspace}
           >
             Return to My Company Workspace
           </Button>
@@ -53,7 +66,7 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
             leftIcon={<LogOut className="w-4 h-4" />}
             onClick={() => {
               signOut().then(() => {
-                window.location.href = `/t/${attemptedTenantId}`;
+                window.location.reload();
               });
             }}
           >
@@ -64,3 +77,4 @@ export const AccessDeniedScreen: React.FC<AccessDeniedScreenProps> = ({
     </div>
   );
 };
+
