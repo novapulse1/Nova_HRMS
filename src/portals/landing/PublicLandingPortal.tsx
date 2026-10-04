@@ -123,21 +123,18 @@ export const PublicLandingPortal: React.FC = () => {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white max-w-2xl mx-auto leading-tight">
-            Two-Portal Multi-Tenant SaaS Architecture
+            One Platform. Every Organisation.
           </h1>
         </div>
 
         {/* Portal Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-3xl mx-auto">
-          {/* Portal X Card */}
+          {/* Admin Control Panel Card */}
           <div className="bg-slate-900/90 border border-purple-800/80 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 relative group hover:border-purple-600 transition-all">
             <div className="flex items-center justify-between">
               <div className="w-12 h-12 rounded-2xl bg-purple-950 border border-purple-700 flex items-center justify-center text-purple-300">
                 <Server className="w-6 h-6" />
               </div>
-              <span className="text-[10px] font-mono uppercase font-bold text-purple-400 px-2 py-0.5 rounded-full bg-purple-950/60 border border-purple-800">
-                Portal X
-              </span>
             </div>
 
             <div>
@@ -157,15 +154,12 @@ export const PublicLandingPortal: React.FC = () => {
             </button>
           </div>
 
-          {/* Portal Y Card */}
+          {/* Client HRMS Portal Card */}
           <div className="bg-slate-900/90 border border-brand-800/80 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 relative group hover:border-brand-600 transition-all">
             <div className="flex items-center justify-between">
               <div className="w-12 h-12 rounded-2xl bg-brand-950 border border-brand-700 flex items-center justify-center text-brand-300">
                 <Building2 className="w-6 h-6" />
               </div>
-              <span className="text-[10px] font-mono uppercase font-bold text-brand-400 px-2 py-0.5 rounded-full bg-brand-950/60 border border-brand-800">
-                Portal Y
-              </span>
             </div>
 
             <div>
