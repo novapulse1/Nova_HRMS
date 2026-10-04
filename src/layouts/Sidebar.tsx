@@ -16,11 +16,6 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
-import { LeaveService } from '../services/leaveService';
-import { ShiftService } from '../services/shiftService';
-import { TicketService } from '../services/ticketService';
-import { OnboardingService } from '../services/onboardingService';
 import { cn } from '../utils/cn';
 
 interface SidebarProps {
@@ -38,104 +33,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentUser, currentEmployee, can, isSuperAdmin, isHR, isManager, activeTenant, signOut } = useAuth();
 
-  // Dynamic counts for badges
-  const pendingLeaves = LeaveService.getApplications().filter(a => a.status === 'pending').length;
-  const pendingSwaps = ShiftService.getSwapRequests().filter(
-    s => s.status === 'pending_peer' || s.status === 'peer_accepted'
-  ).length;
-  const openTickets = TicketService.getAll().filter(t => t.status === 'Open' || t.status === 'In Progress').length;
-  const submittedOnboarding = OnboardingService.getAll().filter(o => o.status === 'submitted').length;
-  const currentEmpId = currentEmployee?.id || currentUser.id;
-
   const navigationItems = [
     {
       id: 'dashboard',
       name: 'Dashboard',
       icon: <LayoutDashboard className="w-5 h-5" />,
       moduleKey: 'dashboard',
-      badge: null,
     },
     {
       id: 'shifts',
       name: 'Shift Management',
       icon: <Clock className="w-5 h-5" />,
       moduleKey: 'shifts',
-      badge: pendingSwaps > 0 ? `${pendingSwaps}` : null,
-      badgeColor: 'bg-amber-500 text-white',
     },
     {
       id: 'attendance',
       name: 'Attendance',
       icon: <CalendarCheck className="w-5 h-5" />,
       moduleKey: 'attendance',
-      badge: null,
     },
     {
       id: 'leaves',
       name: 'Leave Management',
       icon: <CalendarDays className="w-5 h-5" />,
       moduleKey: 'leaves',
-      badge: pendingLeaves > 0 ? `${pendingLeaves}` : null,
-      badgeColor: 'bg-brand-500 text-white',
     },
     {
       id: 'employees',
       name: 'Employee Master',
       icon: <Users className="w-5 h-5" />,
       moduleKey: 'employees',
-      badge: null,
     },
     {
       id: 'tickets',
       name: 'Ticket Management',
       icon: <LifeBuoy className="w-5 h-5" />,
       moduleKey: 'tickets',
-      badge: openTickets > 0 ? `${openTickets}` : null,
-      badgeColor: 'bg-sky-500 text-white',
     },
     {
       id: 'onboarding',
       name: 'Onboarding Master',
       icon: <UserPlus className="w-5 h-5" />,
       moduleKey: 'onboarding',
-      badge: submittedOnboarding > 0 ? `${submittedOnboarding}` : null,
-      badgeColor: 'bg-emerald-500 text-white',
     },
     {
       id: 'inventory',
       name: 'Inventory Assets',
       icon: <Package className="w-5 h-5" />,
       moduleKey: 'inventory',
-      badge: null,
     },
     {
       id: 'geolocation',
       name: 'Geo Location',
       icon: <MapPin className="w-5 h-5" />,
       moduleKey: 'geolocation',
-      badge: null,
     },
     {
       id: 'payroll',
       name: 'Payroll Management',
       icon: <FileSpreadsheet className="w-5 h-5" />,
       moduleKey: 'payroll',
-      badge: null,
     },
     {
       id: 'insights',
       name: 'MMP Insights',
       icon: <Sparkles className="w-5 h-5 text-purple-400" />,
       moduleKey: 'insights',
-      badge: 'AI',
-      badgeColor: 'bg-purple-600 text-white font-bold',
     },
     {
       id: 'settings',
       name: 'Settings & Admin',
       icon: <Settings className="w-5 h-5" />,
       moduleKey: 'settings',
-      badge: null,
     },
   ];
 
@@ -235,19 +204,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>{item.name}</span>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  {item.badge && (
-                    <span
-                      className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                        item.badgeColor || 'bg-brand-700 text-white'
-                      )}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-brand-300" />}
-                </div>
+                {isActive && <ChevronRight className="w-3.5 h-3.5 text-brand-300 shrink-0" />}
               </button>
             );
           })}
