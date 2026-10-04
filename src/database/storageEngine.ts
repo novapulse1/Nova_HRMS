@@ -29,9 +29,6 @@ import {
   INITIAL_OVERTIME_CONFIGS,
   INITIAL_SALARY_COMPONENTS,
   INITIAL_DEDUCTION_POLICIES,
-  INITIAL_TASKS,
-  INITIAL_PROJECTS,
-  INITIAL_WORKFLOW_TEMPLATES,
   generateSeedAttendance,
 } from './seedData';
 import {
@@ -45,9 +42,6 @@ import {
   OvertimeConfig,
   SalaryComponent,
   DeductionPolicy,
-  TaskItem,
-  TeamProject,
-  WorkflowTemplate,
 } from './schema';
 
 const STORAGE_PREFIX = 'novapulse_hrms_v1_';
@@ -104,9 +98,6 @@ export const STORAGE_KEYS = {
   MMP_SAVED_INSIGHTS: `${STORAGE_PREFIX}mmp_saved_insights`,
   MMP_AI_USAGE: `${STORAGE_PREFIX}mmp_ai_usage`,
   MMP_AI_SETTINGS: `${STORAGE_PREFIX}mmp_ai_settings`,
-  TASKS: `${STORAGE_PREFIX}tasks`,
-  PROJECTS: `${STORAGE_PREFIX}projects`,
-  WORKFLOW_TEMPLATES: `${STORAGE_PREFIX}workflow_templates`,
   HOLIDAYS: `${STORAGE_PREFIX}holidays`,
   SYSTEM_SETTINGS: `${STORAGE_PREFIX}system_settings`,
   NOTIFICATIONS: `${STORAGE_PREFIX}notifications`,
@@ -181,7 +172,11 @@ export class StorageEngine {
                 tenants[index].subdomain = initTenant.subdomain || initTenant.slug;
                 changed = true;
               }
-              // Safely sync enabledModules for seed tenants (e.g. adding 'tasks')
+              // Clean up 'tasks' if cached in legacy tenant objects
+              if (tenants[index].enabledModules) {
+                tenants[index].enabledModules = tenants[index].enabledModules!.filter(m => m !== 'tasks');
+              }
+              // Safely sync enabledModules for seed tenants
               if (initTenant.enabledModules && initTenant.enabledModules.length > 0) {
                 if (!tenants[index].enabledModules) {
                   tenants[index].enabledModules = [...initTenant.enabledModules];
@@ -220,15 +215,6 @@ export class StorageEngine {
       }
       if (!safeStorage.getItem(STORAGE_KEYS.DEDUCTION_POLICIES)) {
         safeStorage.setItem(STORAGE_KEYS.DEDUCTION_POLICIES, JSON.stringify(INITIAL_DEDUCTION_POLICIES));
-      }
-      if (!safeStorage.getItem(STORAGE_KEYS.TASKS)) {
-        safeStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(INITIAL_TASKS));
-      }
-      if (!safeStorage.getItem(STORAGE_KEYS.PROJECTS)) {
-        safeStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(INITIAL_PROJECTS));
-      }
-      if (!safeStorage.getItem(STORAGE_KEYS.WORKFLOW_TEMPLATES)) {
-        safeStorage.setItem(STORAGE_KEYS.WORKFLOW_TEMPLATES, JSON.stringify(INITIAL_WORKFLOW_TEMPLATES));
       }
 
       // Sync employees to ensure payrollCycleId and attendancePolicyId default if missing
@@ -307,9 +293,6 @@ export class StorageEngine {
     safeStorage.setItem(STORAGE_KEYS.DEDUCTION_POLICIES, JSON.stringify(INITIAL_DEDUCTION_POLICIES));
     safeStorage.setItem(STORAGE_KEYS.PAYROLL_PERIODS, JSON.stringify([]));
     safeStorage.setItem(STORAGE_KEYS.PAYSLIPS, JSON.stringify([]));
-    safeStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(INITIAL_TASKS));
-    safeStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(INITIAL_PROJECTS));
-    safeStorage.setItem(STORAGE_KEYS.WORKFLOW_TEMPLATES, JSON.stringify(INITIAL_WORKFLOW_TEMPLATES));
     safeStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(INITIAL_HOLIDAYS));
     safeStorage.setItem(STORAGE_KEYS.SYSTEM_SETTINGS, JSON.stringify(INITIAL_SYSTEM_SETTINGS));
     safeStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));

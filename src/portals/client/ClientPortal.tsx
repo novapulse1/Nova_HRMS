@@ -15,7 +15,6 @@ import { OnboardingModule } from '../../modules/onboarding/OnboardingModule';
 import { InventoryModule } from '../../modules/inventory-management/InventoryModule';
 import { GeoLocationModule } from '../../modules/geo-location/GeoLocationModule';
 import { PayrollModule } from '../../modules/payroll/PayrollModule';
-import { TaskManagementModule } from '../../modules/task-management/TaskManagementModule';
 import { MMPInsightsModule } from '../../modules/mmp-insights/MMPInsightsModule';
 import { SettingsModule } from '../../modules/settings/SettingsModule';
 import { SetupWizardModal } from '../../components/common/SetupWizardModal';
@@ -48,8 +47,6 @@ export const ClientPortal: React.FC = () => {
         return <GeoLocationModule />;
       case 'payroll':
         return <PayrollModule />;
-      case 'tasks':
-        return <TaskManagementModule />;
       case 'insights':
         return <MMPInsightsModule />;
       case 'settings':

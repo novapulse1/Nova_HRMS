@@ -297,7 +297,6 @@ export class TenantService {
       'inventory',
       'geolocation',
       'payroll',
-      'tasks',
       'settings'
     ];
 
