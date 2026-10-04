@@ -17,7 +17,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { PLATFORM_DOMAIN, getTenantSubdomainUrl } from '../../config/appConfig';
+import { PLATFORM_DOMAIN, getTenantSubdomainUrl, getAdminPortalUrl } from '../../config/appConfig';
 import { TenantService } from '../../services/tenantService';
 import { TenantHostService } from '../../services/tenantHostService';
 import { normalizeSlug } from '../../services/tenantResolver';
@@ -26,7 +26,14 @@ export const PublicLandingPortal: React.FC = () => {
   const { isSuperAdmin, setAppEnvironment } = useAuth();
   const [searchSlug, setSearchSlug] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [lookupResult, setLookupResult] = useState<{ found: boolean; tenant?: any; url?: string } | null>(null);
+  const [lookupResult, setLookupResult] = useState<{
+    found: boolean;
+    tenant?: any;
+    url?: string;
+    isAdminReserved?: boolean;
+  } | null>(null);
+
+  const adminUrl = getAdminPortalUrl();
 
   const extractCandidateSlug = (input: string): string => {
     let clean = input.trim().toLowerCase();
@@ -57,6 +64,15 @@ export const PublicLandingPortal: React.FC = () => {
     e.preventDefault();
     const candidate = extractCandidateSlug(searchSlug);
     if (!candidate) return;
+
+    if (candidate === 'admin') {
+      setLookupResult({
+        found: false,
+        isAdminReserved: true,
+      });
+      setIsSearching(false);
+      return;
+    }
 
     setIsSearching(true);
     setLookupResult(null);
@@ -103,13 +119,14 @@ export const PublicLandingPortal: React.FC = () => {
 
         <div className="flex items-center gap-3">
           {isSuperAdmin && (
-            <button
+            <a
+              href={adminUrl}
               onClick={() => setAppEnvironment('super_admin')}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-950/50 transition-all cursor-pointer"
             >
               <Server className="w-4 h-4" />
               <span>Admin Control Panel</span>
-            </button>
+            </a>
           )}
         </div>
       </header>
@@ -145,13 +162,14 @@ export const PublicLandingPortal: React.FC = () => {
               admin.{PLATFORM_DOMAIN}
             </div>
 
-            <button
+            <a
+              href={adminUrl}
               onClick={() => setAppEnvironment('super_admin')}
               className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
             >
               <span>Access Admin Panel</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
+            </a>
           </div>
 
           {/* Client HRMS Portal Card */}
@@ -201,7 +219,21 @@ export const PublicLandingPortal: React.FC = () => {
 
               {!isSearching && lookupResult && (
                 <div className="text-xs">
-                  {lookupResult.found && lookupResult.tenant ? (
+                  {lookupResult.isAdminReserved ? (
+                    <div className="p-3 bg-purple-950/60 border border-purple-800/80 rounded-xl space-y-2 text-left">
+                      <p className="text-purple-200 font-medium">
+                        admin is reserved for the Admin Control Panel. Please use your organization&apos;s subdomain.
+                      </p>
+                      <a
+                        href={adminUrl}
+                        onClick={() => setAppEnvironment('super_admin')}
+                        className="inline-flex items-center gap-1.5 text-purple-300 hover:text-purple-100 font-bold hover:underline"
+                      >
+                        <span>Go to Admin Panel</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  ) : lookupResult.found && lookupResult.tenant ? (
                     <a
                       href={lookupResult.url}
                       className="inline-flex items-center gap-1.5 text-emerald-400 hover:underline font-bold"

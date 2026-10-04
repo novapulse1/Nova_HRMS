@@ -38,4 +38,21 @@ export const getTenantLoginUrl = (
   return `${APP_BASE_URL}/t/${tenantIdOrSlug}`;
 };
 
+/**
+ * Returns the admin control panel URL
+ * Example: https://admin.makemypayroll.com
+ */
+export const getAdminPortalUrl = (
+  platformDomain: string = PLATFORM_DOMAIN
+): string => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `${window.location.protocol}//admin.localhost${window.location.port ? `:${window.location.port}` : ''}`;
+    }
+  }
+  return `https://admin.${platformDomain}`;
+};
+
+
 
