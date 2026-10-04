@@ -59,10 +59,9 @@ export const SuperAdminSidebar: React.FC<SuperAdminSidebarProps> = ({
     },
     {
       id: 'plans',
-      name: 'Plans & Features',
+      name: 'Client Module Access',
       icon: <Layers className="w-5 h-5" />,
-      badge: '4 Tiers',
-      badgeColor: 'bg-purple-900 text-purple-200',
+      badge: null,
     },
     {
       id: 'licences',

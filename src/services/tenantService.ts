@@ -462,6 +462,45 @@ export class TenantService {
     return updated;
   }
 
+  public static updateEnabledModules(
+    tenantId: string,
+    enabledModules: string[],
+    adminName: string = 'Super Admin'
+  ): { success: boolean; message: string; tenant?: Tenant } {
+    const tenant = this.getById(tenantId);
+    if (!tenant) return { success: false, message: 'Tenant not found.' };
+
+    const prevModules = tenant.enabledModules || [];
+    const updated = this.update(tenant.id, {
+      enabledModules: Array.from(new Set(enabledModules))
+    });
+
+    AuditService.log({
+      userId: 'user-001',
+      userName: adminName,
+      userRole: 'Super Admin',
+      module: 'Client Module Access',
+      action: 'UPDATE',
+      description: `Updated module access for ${tenant.companyName} (${tenant.tenantId}) to: [${enabledModules.join(', ')}]`,
+      recordId: tenantId,
+      previousValue: JSON.stringify(prevModules),
+      newValue: JSON.stringify(enabledModules)
+    });
+
+    if (isSupabaseConfigured()) {
+      supabase
+        .from('tenants')
+        .update({ enabled_modules: enabledModules })
+        .eq('tenant_id', tenant.tenantId)
+        .then(({ error }) => {
+          if (error) console.error('Supabase tenant module update error:', error);
+        });
+    }
+
+    return { success: true, message: 'Module access updated successfully.', tenant: updated };
+  }
+
+
   public static updateLicence(
     tenantId: string,
     newLimit: number,

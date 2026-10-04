@@ -10,6 +10,7 @@ import {
   Package,
   MapPin,
   FileSpreadsheet,
+  CheckSquare,
   Settings,
   ChevronRight,
   Sparkles,
@@ -95,6 +96,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       moduleKey: 'payroll',
     },
     {
+      id: 'tasks',
+      name: 'Task Management',
+      icon: <CheckSquare className="w-5 h-5" />,
+      moduleKey: 'tasks',
+    },
+    {
       id: 'insights',
       name: 'MMP Insights',
       icon: <Sparkles className="w-5 h-5 text-purple-400" />,
@@ -110,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Filter items based on tenant plan enabled modules and user's permissions
   const visibleItems = navigationItems.filter(item => {
-    if (activeTenant?.enabledModules && activeTenant.enabledModules.length > 0) {
+    if (activeTenant?.enabledModules !== undefined && Array.isArray(activeTenant.enabledModules)) {
       if (!activeTenant.enabledModules.includes(item.moduleKey)) return false;
     }
     if (isSuperAdmin) return true;

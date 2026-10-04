@@ -137,8 +137,8 @@ export class PlanService {
   }
 
   public static isModuleAllowedForTenant(moduleKey: string, tenant: Tenant): boolean {
-    // If tenant has explicit overrides
-    if (tenant.enabledModules && tenant.enabledModules.length > 0) {
+    // If tenant has explicit enabledModules array (Super Admin configured)
+    if (tenant.enabledModules !== undefined && Array.isArray(tenant.enabledModules)) {
       return tenant.enabledModules.includes(moduleKey);
     }
     const plan = this.getPlanByName(tenant.subscriptionPlan);
@@ -154,7 +154,7 @@ export class PlanService {
   }
 
   public static getEnabledModulesForTenant(tenant: Tenant): string[] {
-    if (tenant.enabledModules && tenant.enabledModules.length > 0) {
+    if (tenant.enabledModules !== undefined && Array.isArray(tenant.enabledModules)) {
       return tenant.enabledModules;
     }
     const plan = this.getPlanByName(tenant.subscriptionPlan);

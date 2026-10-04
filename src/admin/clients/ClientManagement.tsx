@@ -20,7 +20,8 @@ import {
   ArrowRight,
   Copy,
   Check,
-  Globe
+  Globe,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TenantService } from '../../services/tenantService';
@@ -28,6 +29,7 @@ import { EmployeeService } from '../../services/employeeService';
 import { Tenant, SubscriptionPlan, PaymentStatus, TenantStatus } from '../../database/schema';
 import { ROOT_DOMAIN, getTenantLoginUrl, getTenantSubdomainUrl } from '../../config/appConfig';
 import { normalizeSlug } from '../../services/tenantResolver';
+import { ALL_HRMS_MODULES } from '../plans/PlanManagement';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
@@ -52,8 +54,12 @@ export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; o
   const [isLicenceModalOpen, setIsLicenceModalOpen] = useState(false);
   const [isOnHoldModalOpen, setIsOnHoldModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isModulesModalOpen, setIsModulesModalOpen] = useState(false);
+  const [editModulesList, setEditModulesList] = useState<string[]>([]);
+  const [modulesSuccessMsg, setModulesSuccessMsg] = useState('');
   const [createdTenantSuccess, setCreatedTenantSuccess] = useState<Tenant | null>(null);
   const [copiedTenantId, setCopiedTenantId] = useState<string | null>(null);
+
 
   // Licence adjustment form
   const [newLicenceLimit, setNewLicenceLimit] = useState(20);
@@ -399,6 +405,20 @@ export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; o
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </Button>
+
+                          {/* Module Access */}
+                          <button
+                            onClick={() => {
+                              setSelectedTenant(tenant);
+                              setEditModulesList(tenant.enabledModules || ALL_HRMS_MODULES.map(m => m.key));
+                              setModulesSuccessMsg('');
+                              setIsModulesModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-purple-950/80 hover:bg-purple-900 text-purple-300 hover:text-white border border-purple-800/80"
+                            title="Manage Module Entitlements"
+                          >
+                            <Layers className="w-4 h-4 text-purple-400" />
+                          </button>
 
                           {/* Adjust Licences */}
                           <button
@@ -897,6 +917,124 @@ export const ClientManagement: React.FC<{ isCreateModalOpenExternal?: boolean; o
               >
                 Login as Client Now
               </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* CLIENT MODULE ACCESS MODAL */}
+      {selectedTenant && (
+        <Modal
+          isOpen={isModulesModalOpen}
+          onClose={() => setIsModulesModalOpen(false)}
+          title={`Configure Module Access — ${selectedTenant.companyName}`}
+          size="lg"
+        >
+          <div className="space-y-4 text-slate-100">
+            <div className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+              <div>
+                <span className="text-slate-400">Client ID:</span>{' '}
+                <span className="font-mono font-bold text-purple-300">{selectedTenant.tenantId}</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Active Modules:</span>{' '}
+                <span className="font-mono font-bold text-emerald-400">{editModulesList.length} / {ALL_HRMS_MODULES.length}</span>
+              </div>
+            </div>
+
+            {modulesSuccessMsg && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-700 text-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>{modulesSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-96 overflow-y-auto pr-1">
+              {ALL_HRMS_MODULES.map(m => {
+                const isEnabled = editModulesList.includes(m.key);
+                return (
+                  <div
+                    key={m.key}
+                    onClick={() => {
+                      setEditModulesList(prev =>
+                        prev.includes(m.key) ? prev.filter(k => k !== m.key) : [...prev, m.key]
+                      );
+                    }}
+                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                      isEnabled
+                        ? 'bg-purple-950/40 border-purple-600 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span className="shrink-0">{m.icon}</span>
+                      <div className="truncate">
+                        <div className="font-bold text-xs truncate">{m.name}</div>
+                        <div className="text-[10px] text-slate-500 truncate">{m.category}</div>
+                      </div>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
+                        isEnabled ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-950 border-slate-700 text-transparent'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditModulesList(ALL_HRMS_MODULES.map(m => m.key))}
+                  className="text-xs border-slate-700 text-slate-300 hover:text-white"
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditModulesList(['dashboard'])}
+                  className="text-xs border-slate-700 text-slate-300 hover:text-white"
+                >
+                  Clear All
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsModulesModalOpen(false)}
+                  className="text-slate-400 hover:text-white text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    const res = TenantService.updateEnabledModules(
+                      selectedTenant.tenantId,
+                      editModulesList,
+                      'Super Admin'
+                    );
+                    if (res.success) {
+                      setModulesSuccessMsg('Module access updated successfully.');
+                      setTimeout(() => {
+                        setIsModulesModalOpen(false);
+                      }, 1200);
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
+                >
+                  Save Module Access
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
